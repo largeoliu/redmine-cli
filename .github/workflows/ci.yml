@@ -202,3 +202,11 @@ jobs:
           path: bin/redmine
           retention-days: 7
 
+  # 汇总 job，供 branch protection 的 required check 使用
+  ci-passed:
+    name: CI Passed
+    runs-on: ubuntu-latest
+    needs: [lint, test, e2e, fuzz, benchmark, security, build]
+    steps:
+      - name: All checks passed
+        run: echo "All CI checks passed!"
