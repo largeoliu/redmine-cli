@@ -9,21 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  wait-for-ci:
-    name: Wait for CI
-    runs-on: ubuntu-latest
-    steps:
-      - name: Wait for CI to pass
-        uses: lewagon/wait-on-check-action@v1.3.4
-        with:
-          ref: ${{ github.ref }}
-          check-name: 'CI Passed'
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          wait-interval: 10
-          allowed-conclusions: success
-
   goreleaser:
-    needs: wait-for-ci
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
