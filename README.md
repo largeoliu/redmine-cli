@@ -354,6 +354,36 @@ redmine priority list
 - [docs/config.md](docs/config.md) - 配置文件格式、多实例、环境变量
 - [docs/output.md](docs/output.md) - 输出格式、jq 过滤、字段选择
 
+## Agent Skill
+
+本项目包含一个 AI Agent Skill（`skills/redmine-workflow/`），可自动化开发工作流。
+
+### 功能
+
+- **开始需求**：输入需求 issue 号 → 创建 `feature/{作者名}/{issue号}` 分支 + 更新状态为"进行中"
+- **开始任务**：输入任务 issue 号 → 自动将状态更新为"开发中"
+
+### 使用方式
+
+在 AI Agent 对话中，直接说：
+
+```
+开始需求 12345
+开始任务 12350
+```
+
+Agent 会自动查询 issue 信息、创建分支、更新状态。
+
+### Skill 结构
+
+```
+skills/redmine-workflow/
+├── SKILL.md                          # 主入口：意图判断、全局规则
+└── references/
+    ├── branch-workflow.md            # 详细工作流步骤
+    └── redmine-commands.md           # redmine CLI 命令速查
+```
+
 ## License
 
 MIT
