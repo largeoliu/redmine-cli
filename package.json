@@ -1,0 +1,41 @@
+{
+  "name": "redminectl",
+  "version": "0.1.0",
+  "description": "AI Agent friendly Redmine CLI tool",
+  "main": "index.js",
+  "bin": {
+    "redmine": "./bin/redmine"
+  },
+  "scripts": {
+    "postinstall": "node scripts/download.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/largeoliu/redmine-cli.git"
+  },
+  "keywords": [
+    "redmine",
+    "cli",
+    "issue-tracker",
+    "project-management",
+    "ai-agent"
+  ],
+  "author": "largeoliu",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/largeoliu/redmine-cli/issues"
+  },
+  "homepage": "https://github.com/largeoliu/redmine-cli#readme",
+  "engines": {
+    "node": ">=14"
+  },
+  "files": [
+    "bin",
+    "scripts"
+  ],
+  "dependencies": {
+    "axios": "^1.6.0",
+    "unzipper": "^0.10.14",
+    "tar": "^6.2.0"
+  }
+}
