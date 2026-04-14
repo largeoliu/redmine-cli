@@ -1,0 +1,46 @@
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test artifacts
+*.test
+*.out
+coverage.txt
+coverage.out
+coverage.html
+coverage
+coverage_*
+cover_*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Config (for testing)
+.test_config/
+
+# Environment files with secrets
+.env
+.env.local
+.env.*.local
+test/integration/.env
+
+# Fuzz corpus
+**/testdata/fuzz/
+
+# Local git worktrees
+.worktrees/
+
+# Trae IDE specs (not tracked in git)
+.trae/
+docs/superpowers/

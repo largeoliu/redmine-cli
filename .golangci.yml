@@ -1,0 +1,113 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gosec
+    - gocyclo
+    - dupl
+    - misspell
+    - revive
+    - prealloc
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+    gocyclo:
+      min-complexity: 15
+    dupl:
+      threshold: 100
+    misspell:
+      locale: US
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: exported
+        - name: if-return
+        - name: increment-decrement
+        - name: var-naming
+        - name: var-declaration
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: indent-error-flow
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
+        - name: unused-parameter
+        - name: unreachable-code
+        - name: redefines-builtin-id
+    gosec:
+      excludes:
+        - G104
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - dupl
+          - gosec
+          - errcheck
+          - gocyclo
+          - revive
+          - unused
+          - staticcheck
+          - misspell
+          - prealloc
+          - govet
+          - ineffassign
+      - path: (^|/)test/e2e/
+        linters:
+          - dupl
+          - gosec
+          - errcheck
+          - gocyclo
+          - revive
+          - unused
+          - staticcheck
+          - misspell
+          - prealloc
+          - govet
+          - ineffassign
+      - path: (^|/)test/integration/
+        linters:
+          - dupl
+          - gosec
+          - errcheck
+          - gocyclo
+          - revive
+          - unused
+          - staticcheck
+          - misspell
+          - prealloc
+          - govet
+          - ineffassign
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    gofmt:
+      simplify: true
+    goimports:
+      local-prefixes:
+        - github.com/largeoliu/redmine-cli
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
