@@ -1,53 +1,34 @@
 name: Release
 
 on:
-  workflow_run:
-    workflows:
-      - CI
-    types:
-      - completed
-    branches-ignore:
-      - main
-      - master
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
 
 jobs:
-  prepare:
-    name: Prepare Release
+  wait-for-ci:
+    name: Wait for CI
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && startsWith(github.event.workflow_run.head_branch, 'v') }}
-    outputs:
-      tag: ${{ steps.discover.outputs.tag }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Wait for CI to pass
+        uses: lewagon/wait-on-check-action@v1.3.4
         with:
-          fetch-depth: 0
-
-      - name: Fetch tags
-        run: git fetch --force --tags origin
-
-      - name: Discover release tag
-        id: discover
-        run: |
-          tag=$(git tag --points-at "${{ github.event.workflow_run.head_sha }}" 'v*' | head -n 1)
-          if [ -z "$tag" ]; then
-            echo "No v* tag found for commit ${{ github.event.workflow_run.head_sha }}, skipping release"
-            exit 1
-          fi
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          ref: ${{ github.ref }}
+          check-name: 'CI Passed'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+          allowed-conclusions: success
 
   goreleaser:
-    needs: prepare
+    needs: wait-for-ci
     runs-on: ubuntu-latest
-    if: ${{ needs.prepare.result == 'success' }}
     steps:
-      - name: Checkout tag
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: refs/tags/${{ needs.prepare.outputs.tag }}
           fetch-depth: 0
 
       - name: Set up Go
@@ -63,28 +44,4 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-
-  npm-publish:
-    needs: [prepare, goreleaser]
-    runs-on: ubuntu-latest
-    if: ${{ needs.goreleaser.result == 'success' }}
-    steps:
-      - name: Checkout tag
-        uses: actions/checkout@v4
-        with:
-          ref: refs/tags/${{ needs.prepare.outputs.tag }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
-
-      - name: Install dependencies
-        run: npm ci || npm install
-
-      - name: Publish to npm
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

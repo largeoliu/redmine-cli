@@ -6,9 +6,7 @@
   "bin": {
     "redmine": "./bin/redmine"
   },
-  "scripts": {
-    "postinstall": "node scripts/download.js"
-  },
+  "scripts": {},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/largeoliu/redmine-cli.git"
@@ -31,11 +29,6 @@
   },
   "files": [
     "bin",
-    "scripts"
-  ],
-  "dependencies": {
-    "axios": "^1.6.0",
-    "unzipper": "^0.10.14",
-    "tar": "^6.2.0"
-  }
+    "dist"
+  ]
 }

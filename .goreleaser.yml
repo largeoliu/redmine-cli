@@ -1,4 +1,4 @@
-project_name: redmine-cli
+project_name: redmine
 
 before:
   hooks:
@@ -52,4 +52,25 @@ release:
     name: redmine-cli
   draft: false
   prerelease: auto
-  replace_existing_artifacts: true
+  overwrite: true
+
+npm:
+  - name: redminectl
+    registry: npmjs
+    token: "{{ .Env.NPM_TOKEN }}"
+
+brews:
+  - name: redmine-cli
+    repository:
+      owner: largeoliu
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/largeoliu/redmine-cli"
+    description: "AI Agent friendly Redmine CLI tool"
+    license: "MIT"
+    test: |
+      system "#{bin}/redmine version"
+    install: |
+      bin.install "redmine"
