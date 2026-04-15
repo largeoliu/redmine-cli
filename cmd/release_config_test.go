@@ -98,8 +98,16 @@ func TestReleaseWorkflowMatchesConfiguredPublishTargets(t *testing.T) {
 		t.Fatal("expected GoReleaser action version to be set")
 	}
 
+	if version == "latest" {
+		t.Fatal("expected GoReleaser action version to be pinned explicitly, not latest")
+	}
+
 	if strings.HasPrefix(version, "v1.") {
 		t.Fatalf("expected GoReleaser v2-compatible action version, got %q", version)
+	}
+
+	if !strings.Contains(version, "v2") {
+		t.Fatalf("expected GoReleaser action version to target v2, got %q", version)
 	}
 
 	if _, exists := goreleaserStep.Env["GITHUB_TOKEN"]; !exists {
