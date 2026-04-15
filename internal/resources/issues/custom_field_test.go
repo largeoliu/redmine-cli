@@ -62,6 +62,49 @@ func TestParseCustomFieldFlags_IDFormat(t *testing.T) {
 	}
 }
 
+func TestMergeCustomFields(t *testing.T) {
+	tests := []struct {
+		name        string
+		interactive []CustomField
+		flags       []CustomField
+		want        []CustomField
+	}{
+		{
+			name:        "both empty",
+			interactive: []CustomField{},
+			flags:       []CustomField{},
+			want:        nil,
+		},
+		{
+			name:        "only interactive",
+			interactive: []CustomField{{ID: 1, Value: "v1"}},
+			flags:       []CustomField{},
+			want:        []CustomField{{ID: 1, Value: "v1"}},
+		},
+		{
+			name:        "only flags",
+			interactive: []CustomField{},
+			flags:       []CustomField{{ID: 2, Value: "v2"}},
+			want:        []CustomField{{ID: 2, Value: "v2"}},
+		},
+		{
+			name:        "flags override interactive",
+			interactive: []CustomField{{ID: 1, Value: "interactive"}, {ID: 2, Value: "i2"}},
+			flags:       []CustomField{{ID: 1, Value: "flag"}, {ID: 3, Value: "f3"}},
+			want:        []CustomField{{ID: 1, Value: "flag"}, {ID: 2, Value: "i2"}, {ID: 3, Value: "f3"}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := mergeCustomFields(tt.interactive, tt.flags)
+			if !equalCustomFields(got, tt.want) {
+				t.Errorf("mergeCustomFields() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func equalCustomFields(a, b []CustomField) bool {
 	if len(a) != len(b) {
 		return false
