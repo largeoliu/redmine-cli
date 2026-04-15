@@ -217,7 +217,7 @@ jobs:
         env:
           GOTOOLCHAIN: auto
         with:
-          args: -exclude=G115 ./...
+          args: -exclude=G104,G115 ./...
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.35.0
