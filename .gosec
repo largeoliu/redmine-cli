@@ -1,0 +1,4 @@
+# Gosec configuration to exclude G104 (errors unhandled)
+# These are intentionally ignored for fmt.Scanln in interactive prompts
+
+exclude = G104
