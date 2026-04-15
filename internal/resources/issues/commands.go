@@ -271,7 +271,10 @@ func newCreateCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.
 			}
 			var flagCFs []CustomField
 			if len(createFlags.Fields) > 0 {
-				flagCFs, _ = parseCustomFieldFlags(createFlags.Fields, trackerDef)
+				flagCFs, err = parseCustomFieldFlags(createFlags.Fields, trackerDef)
+				if err != nil {
+					return err
+				}
 			}
 			var interactiveCFs []CustomField
 			if trackerDef != nil {
@@ -327,7 +330,10 @@ func newUpdateCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.
 			}
 			var flagCFs []CustomField
 			if len(updateFlags.Fields) > 0 {
-				flagCFs, _ = parseCustomFieldFlags(updateFlags.Fields, nil)
+				flagCFs, err = parseCustomFieldFlags(updateFlags.Fields, nil)
+				if err != nil {
+					return err
+				}
 			}
 			if len(flagCFs) > 0 {
 				req.CustomFields = flagCFs
