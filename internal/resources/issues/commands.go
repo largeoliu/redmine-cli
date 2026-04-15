@@ -3,8 +3,11 @@ package issues
 
 import (
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 
 	"github.com/largeoliu/redmine-cli/internal/errors"
@@ -63,6 +66,105 @@ func parseCustomFieldFlags(fields []string, tracker *trackers.Tracker) ([]Custom
 		result = append(result, cf)
 	}
 	return result, nil
+}
+
+func promptCustomFields(tracker *trackers.Tracker, initialValues map[int]CustomField) ([]CustomField, error) {
+	if len(tracker.CustomFields) == 0 {
+		return nil, nil
+	}
+
+	if !isatty.IsTerminal(os.Stdout.Fd()) && !isatty.IsCygwinTerminal(os.Stdout.Fd()) {
+		return nil, nil
+	}
+
+	values := make(map[int]CustomField)
+	for k, v := range initialValues {
+		values[k] = v
+	}
+
+	fmt.Println("\n📋 Custom fields detected, please fill in:")
+
+	for _, cf := range tracker.CustomFields {
+		current, hasCurrent := values[cf.ID]
+		defaultVal := ""
+		if hasCurrent {
+			defaultVal = fmt.Sprintf("%v", current.Value)
+		}
+
+		fmt.Printf("[%d] %s\n", cf.ID, cf.Name)
+		fmt.Printf("    Type: %s\n", cf.FieldFormat)
+
+		var input string
+
+		switch cf.FieldFormat {
+		case "list":
+			if len(cf.PossibleValues) > 0 {
+				fmt.Print("    Options: ")
+				for i, pv := range cf.PossibleValues {
+					fmt.Printf("[%d. %s] ", i+1, pv.Label)
+				}
+				fmt.Println()
+				fmt.Print("    Select: ")
+				fmt.Scanln(&input)
+				if input != "" {
+					idx, err := strconv.Atoi(input)
+					if err == nil && idx >= 1 && idx <= len(cf.PossibleValues) {
+						values[cf.ID] = CustomField{ID: cf.ID, Value: cf.PossibleValues[idx-1].Value}
+					}
+				} else if hasCurrent {
+					values[cf.ID] = current
+				}
+			}
+		case "bool":
+			fmt.Print("    (y/n): ")
+			fmt.Scanln(&input)
+			if input == "y" || input == "Y" {
+				values[cf.ID] = CustomField{ID: cf.ID, Value: "1"}
+			} else if input == "n" || input == "N" {
+				values[cf.ID] = CustomField{ID: cf.ID, Value: "0"}
+			} else if hasCurrent {
+				values[cf.ID] = current
+			}
+		case "date":
+			fmt.Printf("    Input (YYYY-MM-DD) [%s]: ", defaultVal)
+			fmt.Scanln(&input)
+			if input == "" && defaultVal != "" {
+				values[cf.ID] = CustomField{ID: cf.ID, Value: defaultVal}
+			} else if input != "" {
+				values[cf.ID] = CustomField{ID: cf.ID, Value: input}
+			}
+		default:
+			fmt.Printf("    Input [%s]: ", defaultVal)
+			fmt.Scanln(&input)
+			if input != "" {
+				values[cf.ID] = CustomField{ID: cf.ID, Value: input}
+			} else if hasCurrent {
+				values[cf.ID] = current
+			}
+		}
+		fmt.Println()
+	}
+
+	result := make([]CustomField, 0, len(values))
+	for _, v := range values {
+		result = append(result, v)
+	}
+	return result, nil
+}
+
+func mergeCustomFields(interactive, flags []CustomField) []CustomField {
+	cfMap := make(map[int]CustomField)
+	for _, cf := range interactive {
+		cfMap[cf.ID] = cf
+	}
+	for _, cf := range flags {
+		cfMap[cf.ID] = cf
+	}
+	result := make([]CustomField, 0, len(cfMap))
+	for _, cf := range cfMap {
+		result = append(result, cf)
+	}
+	return result
 }
 
 func NewCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Command {
@@ -163,12 +265,21 @@ func newCreateCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.
 			if err != nil {
 				return err
 			}
+			var trackerDef *trackers.Tracker
+			if req.TrackerID > 0 {
+				trackerDef, _ = trackers.NewClient(c).Get(cmd.Context(), req.TrackerID)
+			}
+			var flagCFs []CustomField
 			if len(createFlags.Fields) > 0 {
-				cfs, err := parseCustomFieldFlags(createFlags.Fields, nil)
-				if err != nil {
-					return err
-				}
-				req.CustomFields = cfs
+				flagCFs, _ = parseCustomFieldFlags(createFlags.Fields, trackerDef)
+			}
+			var interactiveCFs []CustomField
+			if trackerDef != nil {
+				interactiveCFs, _ = promptCustomFields(trackerDef, nil)
+			}
+			mergedCFs := mergeCustomFields(interactiveCFs, flagCFs)
+			if len(mergedCFs) > 0 {
+				req.CustomFields = mergedCFs
 			}
 			if flags.DryRun {
 				helpers.DryRunCreate("issue", req)
@@ -214,12 +325,12 @@ func newUpdateCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.
 			if err != nil {
 				return err
 			}
+			var flagCFs []CustomField
 			if len(updateFlags.Fields) > 0 {
-				cfs, err := parseCustomFieldFlags(updateFlags.Fields, nil)
-				if err != nil {
-					return err
-				}
-				req.CustomFields = cfs
+				flagCFs, _ = parseCustomFieldFlags(updateFlags.Fields, nil)
+			}
+			if len(flagCFs) > 0 {
+				req.CustomFields = flagCFs
 			}
 			if flags.DryRun {
 				helpers.DryRunUpdate("issue", id, req)
