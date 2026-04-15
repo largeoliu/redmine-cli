@@ -4,6 +4,7 @@ package trackers
 import (
 	"context"
 	"io"
+	"net/http"
 	"testing"
 
 	"github.com/largeoliu/redmine-cli/internal/client"
@@ -110,5 +111,57 @@ func TestListCommand_ResolveClientError(t *testing.T) {
 	err := cmd.Execute()
 	if err == nil {
 		t.Error("expected error from ResolveClient, got nil")
+	}
+}
+
+func TestListCommand_APIError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleError("/trackers.json", http.StatusInternalServerError, "Internal Server Error")
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+	}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from API, got nil")
+	}
+}
+
+func TestListCommand_WriteOutputError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := TrackerList{
+		Trackers: []Tracker{
+			{ID: 1, Name: "Bug"},
+		},
+	}
+	mock.HandleJSON("/trackers.json", response)
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return context.Canceled
+		},
+	}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from WriteOutput, got nil")
 	}
 }

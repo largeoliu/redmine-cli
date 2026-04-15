@@ -6,6 +6,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/largeoliu/redmine-cli/internal/client"
@@ -489,5 +490,320 @@ func TestDeleteCommand_ResolveClientError(t *testing.T) {
 	err := cmd.Execute()
 	if err == nil {
 		t.Error("expected error from ResolveClient, got nil")
+	}
+}
+
+func TestListCommand_APIError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleError("/projects/1/versions.json", http.StatusInternalServerError, "Internal Server Error")
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+	}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{"--project-id", "1"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from API, got nil")
+	}
+}
+
+func TestListCommand_WriteOutputError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := VersionList{
+		Versions:   []Version{},
+		TotalCount: 0,
+	}
+	mock.HandleJSON("/projects/1/versions.json", response)
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return context.Canceled
+		},
+	}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{"--project-id", "1"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from WriteOutput, got nil")
+	}
+}
+
+func TestGetCommand_ResolveClientError(t *testing.T) {
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return nil, context.Canceled
+		},
+	}
+
+	cmd := newGetCommand(flags, resolver)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from ResolveClient, got nil")
+	}
+}
+
+func TestGetCommand_APIError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleError("/versions/1.json", http.StatusNotFound, "Not found")
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+	}
+
+	cmd := newGetCommand(flags, resolver)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from API, got nil")
+	}
+}
+
+func TestGetCommand_WriteOutputError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := struct {
+		Version Version `json:"version"`
+	}{
+		Version: Version{
+			ID:     1,
+			Name:   "v1.0",
+			Status: "open",
+		},
+	}
+	mock.HandleJSON("/versions/1.json", response)
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return context.Canceled
+		},
+	}
+
+	cmd := newGetCommand(flags, resolver)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from WriteOutput, got nil")
+	}
+}
+
+func TestCreateCommand_APIError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleError("/projects/1/versions.json", http.StatusBadRequest, "Bad Request")
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+	}
+
+	cmd := newCreateCommand(flags, resolver)
+	cmd.SetArgs([]string{"--project-id", "1", "--name", "v1.0"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from API, got nil")
+	}
+}
+
+func TestCreateCommand_WriteOutputError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := struct {
+		Version Version `json:"version"`
+	}{
+		Version: Version{
+			ID:     1,
+			Name:   "v1.0",
+			Status: "open",
+		},
+	}
+	mock.HandleJSON("/projects/1/versions.json", response)
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return context.Canceled
+		},
+	}
+
+	cmd := newCreateCommand(flags, resolver)
+	cmd.SetArgs([]string{"--project-id", "1", "--name", "v1.0"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from WriteOutput, got nil")
+	}
+}
+
+func TestUpdateCommand_APIError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleError("/versions/1.json", http.StatusNotFound, "Not found")
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+	}
+
+	cmd := newUpdateCommand(flags, resolver)
+	cmd.SetArgs([]string{"1", "--name", "v1.1"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from API, got nil")
+	}
+}
+
+func TestDeleteCommand_APIError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleError("/versions/1.json", http.StatusNotFound, "Not found")
+
+	flags := &types.GlobalFlags{Yes: true}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+	}
+
+	cmd := newDeleteCommand(flags, resolver)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from API, got nil")
+	}
+}
+
+func TestDeleteCommand_ConfirmDecline(t *testing.T) {
+	flags := &types.GlobalFlags{Yes: false}
+	resolver := &mockResolver{}
+
+	input := "n\n"
+	r, w, _ := os.Pipe()
+	_, _ = w.WriteString(input)
+	w.Close()
+
+	oldStdin := os.Stdin
+	defer func() { os.Stdin = oldStdin }()
+	os.Stdin = r
+
+	var buf bytes.Buffer
+	cmd := newDeleteCommand(flags, resolver)
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDeleteCommand_ConfirmAccept(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.Handle("/versions/1.json", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			t.Errorf("expected DELETE request, got %s", r.Method)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	flags := &types.GlobalFlags{Yes: false}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+	}
+
+	input := "y\n"
+	r, w, _ := os.Pipe()
+	_, _ = w.WriteString(input)
+	w.Close()
+
+	oldStdin := os.Stdin
+	defer func() { os.Stdin = oldStdin }()
+	os.Stdin = r
+
+	var buf bytes.Buffer
+	cmd := newDeleteCommand(flags, resolver)
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestListCommand_WithLimitAndOffset(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := VersionList{
+		Versions:   []Version{},
+		TotalCount: 0,
+	}
+	mock.HandleJSON("/projects/1/versions.json", response)
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return nil
+		},
+	}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{"--project-id", "1", "--limit", "10", "--offset", "5"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
