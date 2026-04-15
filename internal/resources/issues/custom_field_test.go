@@ -95,7 +95,7 @@ func FuzzParseCustomFieldFlags(f *testing.F) {
 		f.Add(tc)
 	}
 
-	f.Fuzz(func(t *testing.T, input string) {
+	f.Fuzz(func(_ *testing.T, input string) {
 		if len(input) > 1000 {
 			return
 		}
