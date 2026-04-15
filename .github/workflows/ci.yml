@@ -86,6 +86,24 @@ jobs:
             echo "Warning: coverage_filtered.out is empty, skipping coverage check"
           fi
 
+  generated:
+    name: Generated Files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Verify generated files are committed
+        run: |
+          go generate ./...
+          git diff --exit-code
+
   e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
@@ -181,7 +199,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [lint, test, e2e]
+    needs: [lint, test, generated, e2e]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -206,7 +224,7 @@ jobs:
   ci-passed:
     name: CI Passed
     runs-on: ubuntu-latest
-    needs: [lint, test, e2e, fuzz, benchmark, security, build]
+    needs: [lint, test, generated, e2e, fuzz, benchmark, security, build]
     steps:
       - name: All checks passed
         run: echo "All CI checks passed!"
