@@ -176,15 +176,178 @@ func TestNPMPackageUsesStandaloneInstaller(t *testing.T) {
 	}
 }
 
+func TestGoReleaserLdflagsTargetInternalAppVariables(t *testing.T) {
+	config := readYAMLMap(t, filepath.Join("..", ".goreleaser.yml"))
+
+	builds, ok := config["builds"].([]any)
+	if !ok || len(builds) == 0 {
+		t.Fatal("expected builds section in .goreleaser.yml")
+	}
+
+	build, ok := builds[0].(map[string]any)
+	if !ok {
+		t.Fatal("expected first build entry to be an object")
+	}
+
+	ldflags, ok := toStringSlice(build["ldflags"])
+	if !ok {
+		t.Fatal("expected ldflags array in first build entry")
+	}
+
+	for _, want := range []string{
+		"-X github.com/largeoliu/redmine-cli/internal/app.version={{.Version}}",
+		"-X github.com/largeoliu/redmine-cli/internal/app.commit={{.Commit}}",
+		"-X github.com/largeoliu/redmine-cli/internal/app.date={{.Date}}",
+	} {
+		if !slices.Contains(ldflags, want) {
+			t.Fatalf("expected ldflags to contain %q, got %v", want, ldflags)
+		}
+	}
+}
+
+func TestGoReleaserDoesNotMutateReleaseInputs(t *testing.T) {
+	config := readYAMLMap(t, filepath.Join("..", ".goreleaser.yml"))
+
+	before, exists := config["before"]
+	if !exists {
+		return
+	}
+
+	beforeMap, ok := before.(map[string]any)
+	if !ok {
+		t.Fatal("expected before section to be an object")
+	}
+
+	hooks, ok := toStringSlice(beforeMap["hooks"])
+	if !ok {
+		t.Fatal("expected before.hooks to be a string array")
+	}
+
+	for _, forbidden := range []string{"go mod tidy", "go generate ./..."} {
+		if slices.Contains(hooks, forbidden) {
+			t.Fatalf("expected release flow to avoid mutating hook %q", forbidden)
+		}
+	}
+}
+
+func TestReleaseWorkflowHasPreflightGate(t *testing.T) {
+	workflow := readWorkflow(t, filepath.Join("..", ".github", "workflows", "release.yml"))
+
+	if _, exists := workflow.Jobs["preflight"]; !exists {
+		t.Fatal("expected preflight job in release workflow")
+	}
+
+	goreleaserJob, ok := workflow.Jobs["goreleaser"]
+	if !ok {
+		t.Fatal("expected goreleaser job in release workflow")
+	}
+
+	goreleaserNeeds, ok := toStringSliceOrString(goreleaserJob.Needs)
+	if !ok || !slices.Contains(goreleaserNeeds, "preflight") {
+		t.Fatalf("expected goreleaser job to need preflight, got %v", goreleaserJob.Needs)
+	}
+
+	npmJob, ok := workflow.Jobs["npm-publish"]
+	if !ok {
+		t.Fatal("expected npm-publish job in release workflow")
+	}
+
+	npmNeeds, ok := toStringSliceOrString(npmJob.Needs)
+	if !ok || !slices.Contains(npmNeeds, "goreleaser") {
+		t.Fatalf("expected npm-publish job to need goreleaser, got %v", npmJob.Needs)
+	}
+}
+
+func TestReleaseWorkflowUsesRepositoryDefaultBranchForPreflight(t *testing.T) {
+	workflow := readWorkflow(t, filepath.Join("..", ".github", "workflows", "release.yml"))
+
+	preflightJob, ok := workflow.Jobs["preflight"]
+	if !ok {
+		t.Fatal("expected preflight job in release workflow")
+	}
+
+	resolveStep := findStepByName(t, preflightJob, "Resolve protected branch")
+	if !strings.Contains(resolveStep.Run, "github.event.repository.default_branch") {
+		t.Fatalf("expected Resolve protected branch step to use repository default branch, got %q", resolveStep.Run)
+	}
+
+	fetchStep := findStepByName(t, preflightJob, "Fetch protected branch")
+	if strings.Contains(fetchStep.Run, "--depth=1") {
+		t.Fatalf("expected Fetch protected branch step to avoid shallow fetch, got %q", fetchStep.Run)
+	}
+}
+
+func TestReleaseWorkflowPreflightChecksTagLineageAndVersionMetadata(t *testing.T) {
+	workflow := readWorkflow(t, filepath.Join("..", ".github", "workflows", "release.yml"))
+
+	preflightJob, ok := workflow.Jobs["preflight"]
+	if !ok {
+		t.Fatal("expected preflight job in release workflow")
+	}
+
+	ancestryStep := findStepByName(t, preflightJob, "Ensure tag commit is on protected branch")
+	if !strings.Contains(ancestryStep.Run, "git merge-base --is-ancestor") {
+		t.Fatalf("expected ancestry step to use git merge-base --is-ancestor, got %q", ancestryStep.Run)
+	}
+
+	smokeStep := findStepByName(t, preflightJob, "Smoke test version metadata")
+	if !strings.Contains(smokeStep.Run, "go build -ldflags") {
+		t.Fatalf("expected smoke step to build with ldflags, got %q", smokeStep.Run)
+	}
+	if !strings.Contains(smokeStep.Run, "./bin/redmine version") {
+		t.Fatalf("expected smoke step to run ./bin/redmine version, got %q", smokeStep.Run)
+	}
+}
+
+func TestCIWorkflowVerifiesGeneratedFiles(t *testing.T) {
+	workflow := readWorkflow(t, filepath.Join("..", ".github", "workflows", "ci.yml"))
+
+	generatedJob, ok := workflow.Jobs["generated"]
+	if !ok {
+		t.Fatal("expected generated job in CI workflow")
+	}
+
+	verifyStep := findStepByName(t, generatedJob, "Verify generated files are committed")
+	if !strings.Contains(verifyStep.Run, "go generate ./...") {
+		t.Fatalf("expected generated job to run go generate ./..., got %q", verifyStep.Run)
+	}
+	if !strings.Contains(verifyStep.Run, "git diff --exit-code") {
+		t.Fatalf("expected generated job to fail on uncommitted generated output, got %q", verifyStep.Run)
+	}
+
+	buildJob, ok := workflow.Jobs["build"]
+	if !ok {
+		t.Fatal("expected build job in CI workflow")
+	}
+
+	buildNeeds, ok := toStringSliceOrString(buildJob.Needs)
+	if !ok || !slices.Contains(buildNeeds, "generated") {
+		t.Fatalf("expected build job to need generated, got %v", buildJob.Needs)
+	}
+
+	ciPassedJob, ok := workflow.Jobs["ci-passed"]
+	if !ok {
+		t.Fatal("expected ci-passed job in CI workflow")
+	}
+
+	ciPassedNeeds, ok := toStringSliceOrString(ciPassedJob.Needs)
+	if !ok || !slices.Contains(ciPassedNeeds, "generated") {
+		t.Fatalf("expected ci-passed job to need generated, got %v", ciPassedJob.Needs)
+	}
+}
+
 type workflowConfig struct {
 	Jobs map[string]workflowJob `yaml:"jobs"`
 }
 
 type workflowJob struct {
 	Steps []workflowStep `yaml:"steps"`
+	Needs any            `yaml:"needs"`
 }
 
 type workflowStep struct {
+	Name string         `yaml:"name"`
+	Run  string         `yaml:"run"`
 	Uses string         `yaml:"uses"`
 	With map[string]any `yaml:"with"`
 	Env  map[string]any `yaml:"env"`
@@ -269,6 +432,19 @@ func findStepByUses(t *testing.T, job workflowJob, prefix string) workflowStep {
 	return step
 }
 
+func findStepByName(t *testing.T, job workflowJob, name string) workflowStep {
+	t.Helper()
+
+	step, ok := findStep(job, func(step workflowStep) bool {
+		return step.Name == name
+	})
+	if !ok {
+		t.Fatalf("expected step with name %q", name)
+	}
+
+	return step
+}
+
 func findStep(job workflowJob, match func(workflowStep) bool) (workflowStep, bool) {
 	for _, step := range job.Steps {
 		if match(step) {
@@ -295,4 +471,16 @@ func toStringSlice(value any) ([]string, bool) {
 	}
 
 	return result, true
+}
+
+func toStringSliceOrString(value any) ([]string, bool) {
+	if value == nil {
+		return nil, false
+	}
+
+	if single, ok := value.(string); ok {
+		return []string{single}, true
+	}
+
+	return toStringSlice(value)
 }

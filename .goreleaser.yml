@@ -2,11 +2,6 @@ version: 2
 
 project_name: redmine
 
-before:
-  hooks:
-    - go mod tidy
-    - go generate ./...
-
 builds:
   - env:
       - CGO_ENABLED=0
@@ -21,9 +16,9 @@ builds:
     binary: redmine
     ldflags:
       - -s -w
-      - -X main.version={{.Version}}
-      - -X main.commit={{.Commit}}
-      - -X main.date={{.Date}}
+      - -X github.com/largeoliu/redmine-cli/internal/app.version={{.Version}}
+      - -X github.com/largeoliu/redmine-cli/internal/app.commit={{.Commit}}
+      - -X github.com/largeoliu/redmine-cli/internal/app.date={{.Date}}
 
 archives:
   - formats:
