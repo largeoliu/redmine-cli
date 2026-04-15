@@ -8,6 +8,7 @@ import (
 	"github.com/largeoliu/redmine-cli/internal/types"
 )
 
+// NewCommand creates the tracker command.
 func NewCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "tracker",
