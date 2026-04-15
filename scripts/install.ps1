@@ -69,6 +69,38 @@ function Get-LatestVersion {
     Write-Error-Exit "Failed to get latest version"
 }
 
+function Confirm-Checksum {
+    param(
+        [string]$Version,
+        [string]$ArchiveName,
+        [string]$ArchivePath
+    )
+    
+    $checksumsUrl = "https://github.com/$REPO/releases/download/$Version/checksums.txt"
+    
+    Write-Info "Downloading checksums..."
+    try {
+        $checksumsContent = Invoke-WebRequest -Uri $checksumsUrl -UseBasicParsing | Select-Object -ExpandProperty Content
+    } catch {
+        Write-Warn "Could not download checksums, skipping verification"
+        return
+    }
+    
+    $expectedHash = ($checksumsContent -split "`n" | Where-Object { $_ -match "\s+$([regex]::Escape($ArchiveName))`$" } | Select-Object -First 1) -replace '\s+.*', ''
+    if (-not $expectedHash) {
+        Write-Warn "Archive not found in checksums file, skipping verification"
+        return
+    }
+    
+    Write-Info "Verifying checksum..."
+    $actualHash = (Get-FileHash -Path $ArchivePath -Algorithm SHA256).Hash.ToLower()
+    if ($actualHash -ne $expectedHash.ToLower()) {
+        Write-Error-Exit "Checksum mismatch! Expected: $expectedHash, Actual: $actualHash"
+    }
+    
+    Write-Info "Checksum verified"
+}
+
 function Download-Binary {
     param(
         [string]$Version,
@@ -89,6 +121,8 @@ function Download-Binary {
     } catch {
         Write-Error-Exit "Failed to download $archiveName : $_"
     }
+    
+    Confirm-Checksum -Version $Version -ArchiveName $archiveName -ArchivePath $archivePath
     
     Write-Info "Extracting..."
     

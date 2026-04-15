@@ -234,7 +234,7 @@ func TestSplitByComma(t *testing.T) {
 	}
 }
 
-func TestResolverInterface(t *testing.T) {
+func TestResolverInterface(_ *testing.T) {
 	// 测试 resolver 实现 types.Resolver 接口
 	var _ types.Resolver = &resolver{}
 }

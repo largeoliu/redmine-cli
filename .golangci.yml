@@ -53,49 +53,20 @@ linters:
         - name: unreachable-code
         - name: redefines-builtin-id
     gosec:
-      excludes:
-        - G104
   exclusions:
     rules:
       - path: _test\.go
         linters:
           - dupl
-          - gosec
-          - errcheck
           - gocyclo
-          - revive
-          - unused
-          - staticcheck
-          - misspell
-          - prealloc
-          - govet
-          - ineffassign
       - path: (^|/)test/e2e/
         linters:
           - dupl
-          - gosec
-          - errcheck
           - gocyclo
-          - revive
-          - unused
-          - staticcheck
-          - misspell
-          - prealloc
-          - govet
-          - ineffassign
       - path: (^|/)test/integration/
         linters:
           - dupl
-          - gosec
-          - errcheck
           - gocyclo
-          - revive
-          - unused
-          - staticcheck
-          - misspell
-          - prealloc
-          - govet
-          - ineffassign
 
 formatters:
   enable:
