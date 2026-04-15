@@ -1,4 +1,27 @@
-.PHONY: build test clean install lint lint-fix test-coverage install-linter install-hooks e2e fuzz fuzz-client fuzz-output benchmark benchmark-full integration integration-setup integration-cleanup
+.PHONY: build test clean install lint lint-fix test-coverage install-linter install-hooks e2e fuzz fuzz-client fuzz-output benchmark benchmark-full integration integration-setup integration-cleanup help
+
+help:
+	@echo "Usage: make <target>"
+	@echo ""
+	@echo "Targets:"
+	@echo "  build              Build the binary (default)"
+	@echo "  test               Run unit tests"
+	@echo "  test-coverage      Run tests with coverage report"
+	@echo "  lint               Run golangci-lint"
+	@echo "  lint-fix           Run golangci-lint with auto-fix"
+	@echo "  e2e                Run end-to-end tests"
+	@echo "  fuzz               Run fuzz tests (30s each)"
+	@echo "  fuzz-client        Run fuzz tests for client (60s)"
+	@echo "  fuzz-output        Run fuzz tests for output (60s)"
+	@echo "  benchmark          Run benchmarks for client/output"
+	@echo "  benchmark-full     Run all benchmarks (5s each)"
+	@echo "  integration        Run integration tests (requires env vars)"
+	@echo "  integration-setup  Create .env file for integration tests"
+	@echo "  integration-cleanup Clean up test issues"
+	@echo "  install-linter     Install golangci-lint"
+	@echo "  install-hooks      Install git pre-commit hook"
+	@echo "  clean              Remove build artifacts"
+	@echo "  help               Show this help message"
 
 BINARY_NAME=redmine
 VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")

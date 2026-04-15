@@ -5,6 +5,7 @@ const http = require('http');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const crypto = require('crypto');
 const { pipeline } = require('stream');
 const { promisify } = require('util');
 const tar = require('tar');
@@ -56,12 +57,22 @@ function getBinaryName(platform) {
   return BINARY_NAME;
 }
 
-async function downloadFile(url, dest) {
+const MAX_REDIRECTS = 5;
+
+async function downloadFile(url, dest, redirectCount = 0) {
+  if (redirectCount > MAX_REDIRECTS) {
+    throw new Error(`Too many redirects (>${MAX_REDIRECTS})`);
+  }
   return new Promise((resolve, reject) => {
     const protocol = url.startsWith('https') ? https : http;
     protocol.get(url, { headers: { 'User-Agent': 'redmine-cli-npm' } }, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return downloadFile(res.headers.location, dest).then(resolve).catch(reject);
+        let location = res.headers.location;
+        if (location.startsWith('/')) {
+          const parsedUrl = new URL(url);
+          location = `${parsedUrl.protocol}//${parsedUrl.host}${location}`;
+        }
+        return downloadFile(location, dest, redirectCount + 1).then(resolve).catch(reject);
       }
       if (res.statusCode !== 200) {
         return reject(new Error(`HTTP ${res.statusCode}`));
@@ -106,6 +117,40 @@ function findFile(rootDir, targetName) {
   return null;
 }
 
+async function verifyChecksum(version, archiveName, archivePath) {
+  const checksumsUrl = `https://github.com/${REPO}/releases/download/${version}/checksums.txt`;
+
+  console.log('[INFO] Downloading checksums...');
+  let checksumsContent;
+  try {
+    const tmpFile = path.join(path.dirname(archivePath), 'checksums.txt');
+    await downloadFile(checksumsUrl, tmpFile);
+    checksumsContent = fs.readFileSync(tmpFile, 'utf8');
+    fs.unlinkSync(tmpFile);
+  } catch {
+    console.warn('[WARN] Could not download checksums, skipping verification');
+    return;
+  }
+
+  const line = checksumsContent.split('\n').find((l) => l.endsWith(archiveName));
+  if (!line) {
+    console.warn('[WARN] Archive not found in checksums file, skipping verification');
+    return;
+  }
+
+  const expectedSha = line.split(/\s+/)[0];
+  console.log('[INFO] Verifying checksum...');
+  const hash = crypto.createHash('sha256');
+  const data = fs.readFileSync(archivePath);
+  hash.update(data);
+  const actualSha = hash.digest('hex');
+
+  if (actualSha !== expectedSha) {
+    throw new Error(`Checksum mismatch! Expected: ${expectedSha}, Actual: ${actualSha}`);
+  }
+  console.log('[INFO] Checksum verified');
+}
+
 async function main() {
   const binDir = path.join(__dirname, '..', 'bin');
   const platform = getPlatform();
@@ -126,6 +171,8 @@ async function main() {
 
     console.log(`[INFO] Downloading ${archiveName}...`);
     await downloadFile(downloadURL, archivePath);
+
+    await verifyChecksum(version, archiveName, archivePath);
 
     console.log('[INFO] Extracting release archive...');
     await extractArchive(archivePath, tmpDir, platform === 'windows');

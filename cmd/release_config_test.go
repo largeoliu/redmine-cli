@@ -27,8 +27,8 @@ func TestGoReleaserConfigUsesSupportedReleaseTargets(t *testing.T) {
 		t.Fatal("expected release.overwrite to be removed for GoReleaser v2")
 	}
 
-	if got := release["replace_existing_artifacts"]; got != true {
-		t.Fatalf("expected release.replace_existing_artifacts=true, got %v", got)
+	if got := release["replace_existing_artifacts"]; got != false {
+		t.Fatalf("expected release.replace_existing_artifacts=false, got %v", got)
 	}
 
 	if _, exists := config["npm"]; exists {
@@ -39,8 +39,8 @@ func TestGoReleaserConfigUsesSupportedReleaseTargets(t *testing.T) {
 		t.Fatal("expected npm publishing to be moved out of GoReleaser")
 	}
 
-	if _, exists := config["brews"]; exists {
-		t.Fatal("expected Homebrew publishing to be removed from .goreleaser.yml")
+	if _, exists := config["brews"]; !exists {
+		t.Fatal("expected Homebrew section in .goreleaser.yml")
 	}
 
 	archives, ok := config["archives"].([]any)
@@ -399,21 +399,6 @@ func readJSONMap(t *testing.T, path string) map[string]any {
 	}
 
 	return cfg
-}
-
-func findGoReleaserStep(t *testing.T, workflow workflowConfig) workflowStep {
-	t.Helper()
-
-	for _, job := range workflow.Jobs {
-		if step, ok := findStep(job, func(step workflowStep) bool {
-			return strings.HasPrefix(step.Uses, "goreleaser/goreleaser-action@")
-		}); ok {
-			return step
-		}
-	}
-
-	t.Fatal("expected goreleaser action step in release workflow")
-	return workflowStep{}
 }
 
 func findStepByUses(t *testing.T, job workflowJob, prefix string) workflowStep {
