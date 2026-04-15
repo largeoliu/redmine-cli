@@ -35,6 +35,9 @@ func parseCustomFieldFlags(fields []string, tracker *trackers.Tracker) ([]Custom
 
 		cf := CustomField{}
 		if parts[0] == "id" {
+			if len(parts) < 3 {
+				return nil, fmt.Errorf("invalid custom field format: %s (expected id:X:value)", f)
+			}
 			var id int
 			if _, err := fmt.Sscanf(parts[1], "%d", &id); err != nil {
 				return nil, fmt.Errorf("invalid custom field id: %s", parts[1])

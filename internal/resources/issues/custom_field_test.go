@@ -76,3 +76,31 @@ func equalCustomFields(a, b []CustomField) bool {
 	}
 	return true
 }
+
+func FuzzParseCustomFieldFlags(f *testing.F) {
+	testcases := []string{
+		"id:5:value",
+		"id:5:高",
+		"name:value",
+		"invalid",
+		"",
+		"id:abc:value",
+		"id:5:v1.0,v2.0",
+		"id:5:value:with:colons",
+		"id:5:",
+		"id:5:value,",
+	}
+
+	for _, tc := range testcases {
+		f.Add(tc)
+	}
+
+	f.Fuzz(func(t *testing.T, input string) {
+		if len(input) > 1000 {
+			return
+		}
+
+		flags := []string{input}
+		_, _ = parseCustomFieldFlags(flags, nil)
+	})
+}
