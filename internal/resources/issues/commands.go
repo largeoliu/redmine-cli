@@ -71,6 +71,7 @@ func parseCustomFieldFlags(fields []string, tracker *trackers.Tracker) ([]Custom
 	return result, nil
 }
 
+//nolint:gocyclo
 func promptCustomFields(tracker *trackers.Tracker, initialValues map[int]CustomField) ([]CustomField, error) {
 	if len(tracker.CustomFields) == 0 {
 		return nil, nil
@@ -170,6 +171,7 @@ func mergeCustomFields(interactive, flags []CustomField) []CustomField {
 	return result
 }
 
+// NewCommand creates a new issue command with all subcommands.
 func NewCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "issue",
