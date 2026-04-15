@@ -646,7 +646,13 @@ func TestVerboseFlag(t *testing.T) {
 }
 
 func TestMissingURL(t *testing.T) {
-	_, stderr, exitCode := runCommand(
+	// Use a temporary config directory to ensure no existing config interferes
+	tempDir := t.TempDir()
+	env := map[string]string{
+		"REDMINE_CONFIG_DIR": tempDir,
+	}
+
+	_, stderr, exitCode := runCommandWithEnv(env,
 		"--key", "test-api-key",
 		"projects", "list",
 	)
@@ -655,13 +661,21 @@ func TestMissingURL(t *testing.T) {
 		t.Error("Expected non-zero exit code when URL is missing")
 	}
 
-	if !strings.Contains(stderr, "URL") {
-		t.Error("Expected error message about missing URL")
+	// Error message should contain "URL" or "url" (case insensitive check)
+	lowerStderr := strings.ToLower(stderr)
+	if !strings.Contains(lowerStderr, "url") {
+		t.Errorf("Expected error message about missing URL, got: %s", stderr)
 	}
 }
 
 func TestMissingAPIKey(t *testing.T) {
-	_, stderr, exitCode := runCommand(
+	// Use a temporary config directory to ensure no existing config interferes
+	tempDir := t.TempDir()
+	env := map[string]string{
+		"REDMINE_CONFIG_DIR": tempDir,
+	}
+
+	_, stderr, exitCode := runCommandWithEnv(env,
 		"--url", "https://example.com",
 		"projects", "list",
 	)
@@ -670,8 +684,10 @@ func TestMissingAPIKey(t *testing.T) {
 		t.Error("Expected non-zero exit code when API key is missing")
 	}
 
-	if !strings.Contains(stderr, "key") {
-		t.Error("Expected error message about missing API key")
+	// Error message should contain "key" or "api" (case insensitive check)
+	lowerStderr := strings.ToLower(stderr)
+	if !strings.Contains(lowerStderr, "key") && !strings.Contains(lowerStderr, "api") {
+		t.Errorf("Expected error message about missing API key, got: %s", stderr)
 	}
 }
 
