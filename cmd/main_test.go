@@ -97,7 +97,9 @@ func TestMainFunction(t *testing.T) {
 	// Test invalid command returns non-zero exit code
 	t.Run("invalid_command", func(t *testing.T) {
 		cmd := exec.Command(binaryPath, "nonexistent-command")
-		output, _ := cmd.CombinedOutput()
+		output, err := cmd.CombinedOutput()
+		_ = output
+		_ = err
 		// Should fail with non-zero exit code
 		if cmd.ProcessState == nil {
 			t.Fatal("Process state is nil")
@@ -112,8 +114,7 @@ func TestMainFunction(t *testing.T) {
 func TestAppExecuteIntegration(t *testing.T) {
 	// Create a temp config directory to avoid loading real config
 	tmpDir := t.TempDir()
-	_ = os.Setenv("REDMINE_CONFIG_DIR", tmpDir)
-	defer func() { _ = os.Unsetenv("REDMINE_CONFIG_DIR") }()
+	t.Setenv("REDMINE_CONFIG_DIR", tmpDir)
 
 	tests := []struct {
 		name       string
@@ -181,8 +182,7 @@ func TestMainCallsAppExecute(t *testing.T) {
 
 	// Create a temp config directory
 	tmpDir := t.TempDir()
-	_ = os.Setenv("REDMINE_CONFIG_DIR", tmpDir)
-	defer func() { _ = os.Unsetenv("REDMINE_CONFIG_DIR") }()
+	t.Setenv("REDMINE_CONFIG_DIR", tmpDir)
 
 	// Test that Execute function exists and can be called
 	// We use NewRootCommand instead of Execute to avoid os.Exit
@@ -240,7 +240,7 @@ func TestBinarySignalHandling(t *testing.T) {
 			t.Errorf("Binary exited with error: %v", err)
 		}
 	case <-time.After(5 * time.Second):
-		_ = cmd.Process.Kill()
+		_ = cmd.Process.Kill() //nolint:errcheck
 		t.Error("Binary did not exit in time")
 	}
 }
