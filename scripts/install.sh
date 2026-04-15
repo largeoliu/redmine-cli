@@ -3,6 +3,7 @@
 set -e
 
 REPO="largeoliu/redmine-cli"
+ASSET_NAME_PREFIX="redmine-cli"
 BINARY_NAME="redmine"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 
@@ -56,9 +57,9 @@ download_binary() {
     arch="$3"
     
     if [ "$os" = "windows" ]; then
-        archive_name="${BINARY_NAME}_${version#v}_${os}_${arch}.zip"
+        archive_name="${ASSET_NAME_PREFIX}_${version#v}_${os}_${arch}.zip"
     else
-        archive_name="${BINARY_NAME}_${version#v}_${os}_${arch}.tar.gz"
+        archive_name="${ASSET_NAME_PREFIX}_${version#v}_${os}_${arch}.tar.gz"
     fi
     
     download_url="https://github.com/${REPO}/releases/download/${version}/${archive_name}"
