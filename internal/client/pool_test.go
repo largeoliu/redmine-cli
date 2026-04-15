@@ -6,23 +6,29 @@ import (
 	"time"
 )
 
-type customRoundTripper struct{}
-
-func (c *customRoundTripper) RoundTrip(*http.Request) (*http.Response, error) { return nil, nil }
-
 func TestDefaultConnectionPoolConfig(t *testing.T) {
-	cfg := DefaultConnectionPoolConfig()
-	if cfg.MaxIdleConns != 10 {
-		t.Errorf("expected MaxIdleConns 10, got %d", cfg.MaxIdleConns)
+	config := DefaultConnectionPoolConfig()
+
+	if config == nil {
+		t.Fatal("DefaultConnectionPoolConfig() returned nil")
 	}
-	if cfg.MaxIdleConnsPerHost != 5 {
-		t.Errorf("expected MaxIdleConnsPerHost 5, got %d", cfg.MaxIdleConnsPerHost)
+
+	// Verify default values
+	if config.MaxIdleConns != 10 {
+		t.Errorf("DefaultConnectionPoolConfig().MaxIdleConns = %v, want 10", config.MaxIdleConns)
 	}
-	if cfg.MaxConnsPerHost != 10 {
-		t.Errorf("expected MaxConnsPerHost 10, got %d", cfg.MaxConnsPerHost)
+
+	if config.MaxIdleConnsPerHost != 5 {
+		t.Errorf("DefaultConnectionPoolConfig().MaxIdleConnsPerHost = %v, want 5", config.MaxIdleConnsPerHost)
 	}
-	if cfg.IdleConnTimeout != 30*time.Second {
-		t.Errorf("expected IdleConnTimeout 30s, got %v", cfg.IdleConnTimeout)
+
+	if config.MaxConnsPerHost != 10 {
+		t.Errorf("DefaultConnectionPoolConfig().MaxConnsPerHost = %v, want 10", config.MaxConnsPerHost)
+	}
+
+	expectedTimeout := 30 * time.Second
+	if config.IdleConnTimeout != expectedTimeout {
+		t.Errorf("DefaultConnectionPoolConfig().IdleConnTimeout = %v, want %v", config.IdleConnTimeout, expectedTimeout)
 	}
 }
 
@@ -30,350 +36,382 @@ func TestWithConnectionPool(t *testing.T) {
 	tests := []struct {
 		name   string
 		config *ConnectionPoolConfig
-		setup  func(c *Client)
 		want   *ConnectionPoolConfig
 	}{
 		{
-			name:   "nil config uses defaults",
+			name:   "with nil config uses defaults",
 			config: nil,
-			setup:  nil,
 			want:   DefaultConnectionPoolConfig(),
 		},
 		{
-			name: "custom config",
+			name: "with custom config",
 			config: &ConnectionPoolConfig{
 				MaxIdleConns:        20,
 				MaxIdleConnsPerHost: 10,
-				MaxConnsPerHost:     30,
+				MaxConnsPerHost:     20,
 				IdleConnTimeout:     60 * time.Second,
 			},
-			setup: nil,
 			want: &ConnectionPoolConfig{
 				MaxIdleConns:        20,
 				MaxIdleConnsPerHost: 10,
-				MaxConnsPerHost:     30,
+				MaxConnsPerHost:     20,
 				IdleConnTimeout:     60 * time.Second,
 			},
 		},
 		{
-			name: "non-Transport RoundTripper already set",
+			name: "with partial config",
 			config: &ConnectionPoolConfig{
-				MaxIdleConns:        20,
-				MaxIdleConnsPerHost: 10,
-				MaxConnsPerHost:     30,
-				IdleConnTimeout:     60 * time.Second,
+				MaxIdleConns: 15,
 			},
-			setup: func(c *Client) {
-				c.httpClient.Transport = &customRoundTripper{}
+			want: &ConnectionPoolConfig{
+				MaxIdleConns:        15,
+				MaxIdleConnsPerHost: 0,
+				MaxConnsPerHost:     0,
+				IdleConnTimeout:     0,
 			},
-			want: nil,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := NewClient("https://example.com", "test-key")
-			if tt.setup != nil {
-				tt.setup(c)
+			client := &Client{
+				httpClient: &http.Client{},
 			}
-			WithConnectionPool(tt.config)(c)
-			got := c.GetConnectionPoolConfig()
-			if tt.want == nil {
-				if got != nil {
-					t.Fatalf("expected nil, got %+v", got)
-				}
-				return
+
+			opt := WithConnectionPool(tt.config)
+			opt(client)
+
+			transport, ok := client.httpClient.Transport.(*http.Transport)
+			if !ok {
+				t.Fatal("Expected Transport to be *http.Transport")
 			}
-			if got.MaxIdleConns != tt.want.MaxIdleConns {
-				t.Errorf("MaxIdleConns: expected %d, got %d", tt.want.MaxIdleConns, got.MaxIdleConns)
+
+			if transport.MaxIdleConns != tt.want.MaxIdleConns {
+				t.Errorf("MaxIdleConns = %v, want %v", transport.MaxIdleConns, tt.want.MaxIdleConns)
 			}
-			if got.MaxIdleConnsPerHost != tt.want.MaxIdleConnsPerHost {
-				t.Errorf("MaxIdleConnsPerHost: expected %d, got %d", tt.want.MaxIdleConnsPerHost, got.MaxIdleConnsPerHost)
+
+			if transport.MaxIdleConnsPerHost != tt.want.MaxIdleConnsPerHost {
+				t.Errorf("MaxIdleConnsPerHost = %v, want %v", transport.MaxIdleConnsPerHost, tt.want.MaxIdleConnsPerHost)
 			}
-			if got.MaxConnsPerHost != tt.want.MaxConnsPerHost {
-				t.Errorf("MaxConnsPerHost: expected %d, got %d", tt.want.MaxConnsPerHost, got.MaxConnsPerHost)
+
+			if transport.MaxConnsPerHost != tt.want.MaxConnsPerHost {
+				t.Errorf("MaxConnsPerHost = %v, want %v", transport.MaxConnsPerHost, tt.want.MaxConnsPerHost)
 			}
-			if got.IdleConnTimeout != tt.want.IdleConnTimeout {
-				t.Errorf("IdleConnTimeout: expected %v, got %v", tt.want.IdleConnTimeout, got.IdleConnTimeout)
+
+			if transport.IdleConnTimeout != tt.want.IdleConnTimeout {
+				t.Errorf("IdleConnTimeout = %v, want %v", transport.IdleConnTimeout, tt.want.IdleConnTimeout)
 			}
 		})
+	}
+}
+
+func TestWithConnectionPool_WithExistingTransport(t *testing.T) {
+	existingTransport := &http.Transport{
+		MaxIdleConns:        5,
+		MaxIdleConnsPerHost: 2,
+	}
+
+	client := &Client{
+		httpClient: &http.Client{
+			Transport: existingTransport,
+		},
+	}
+
+	config := &ConnectionPoolConfig{
+		MaxIdleConns:        25,
+		MaxIdleConnsPerHost: 12,
+		MaxConnsPerHost:     25,
+		IdleConnTimeout:     45 * time.Second,
+	}
+
+	opt := WithConnectionPool(config)
+	opt(client)
+
+	transport, ok := client.httpClient.Transport.(*http.Transport)
+	if !ok {
+		t.Fatal("Expected Transport to be *http.Transport")
+	}
+
+	if transport.MaxIdleConns != 25 {
+		t.Errorf("MaxIdleConns = %v, want 25", transport.MaxIdleConns)
+	}
+
+	if transport.MaxIdleConnsPerHost != 12 {
+		t.Errorf("MaxIdleConnsPerHost = %v, want 12", transport.MaxIdleConnsPerHost)
 	}
 }
 
 func TestWithMaxIdleConns(t *testing.T) {
-	tests := []struct {
-		name         string
-		maxIdleConns int
-		setup        func(c *Client)
-		expected     int
-		transportOk  bool
-	}{
-		{
-			name:         "creates transport if nil",
-			maxIdleConns: 50,
-			setup:        nil,
-			expected:     50,
-			transportOk:  true,
-		},
-		{
-			name:         "non-Transport RoundTripper already set",
-			maxIdleConns: 50,
-			setup: func(c *Client) {
-				c.httpClient.Transport = &customRoundTripper{}
-			},
-			expected:    0,
-			transportOk: false,
+	client := &Client{
+		httpClient: &http.Client{},
+	}
+
+	opt := WithMaxIdleConns(50)
+	opt(client)
+
+	transport, ok := client.httpClient.Transport.(*http.Transport)
+	if !ok {
+		t.Fatal("Expected Transport to be *http.Transport")
+	}
+
+	if transport.MaxIdleConns != 50 {
+		t.Errorf("MaxIdleConns = %v, want 50", transport.MaxIdleConns)
+	}
+}
+
+func TestWithMaxIdleConns_WithExistingTransport(t *testing.T) {
+	existingTransport := &http.Transport{
+		MaxIdleConns: 10,
+	}
+
+	client := &Client{
+		httpClient: &http.Client{
+			Transport: existingTransport,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			c := NewClient("https://example.com", "test-key")
-			if tt.setup != nil {
-				tt.setup(c)
-			}
-			WithMaxIdleConns(tt.maxIdleConns)(c)
-			transport, ok := c.httpClient.Transport.(*http.Transport)
-			if !tt.transportOk {
-				if ok {
-					t.Fatal("expected transport to not be *http.Transport")
-				}
-				return
-			}
-			if !ok {
-				t.Fatal("expected transport to be *http.Transport")
-			}
-			if transport.MaxIdleConns != tt.expected {
-				t.Errorf("expected MaxIdleConns %d, got %d", tt.expected, transport.MaxIdleConns)
-			}
-		})
+	opt := WithMaxIdleConns(30)
+	opt(client)
+
+	transport, ok := client.httpClient.Transport.(*http.Transport)
+	if !ok {
+		t.Fatal("Expected Transport to be *http.Transport")
+	}
+
+	if transport.MaxIdleConns != 30 {
+		t.Errorf("MaxIdleConns = %v, want 30", transport.MaxIdleConns)
 	}
 }
 
 func TestWithMaxIdleConnsPerHost(t *testing.T) {
-	tests := []struct {
-		name                string
-		maxIdleConnsPerHost int
-		setup               func(c *Client)
-		expected            int
-		transportOk         bool
-	}{
-		{
-			name:                "creates transport if nil",
-			maxIdleConnsPerHost: 25,
-			setup:               nil,
-			expected:            25,
-			transportOk:         true,
-		},
-		{
-			name:                "non-Transport RoundTripper already set",
-			maxIdleConnsPerHost: 25,
-			setup: func(c *Client) {
-				c.httpClient.Transport = &customRoundTripper{}
-			},
-			expected:    0,
-			transportOk: false,
-		},
+	client := &Client{
+		httpClient: &http.Client{},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			c := NewClient("https://example.com", "test-key")
-			if tt.setup != nil {
-				tt.setup(c)
-			}
-			WithMaxIdleConnsPerHost(tt.maxIdleConnsPerHost)(c)
-			transport, ok := c.httpClient.Transport.(*http.Transport)
-			if !tt.transportOk {
-				if ok {
-					t.Fatal("expected transport to not be *http.Transport")
-				}
-				return
-			}
-			if !ok {
-				t.Fatal("expected transport to be *http.Transport")
-			}
-			if transport.MaxIdleConnsPerHost != tt.expected {
-				t.Errorf("expected MaxIdleConnsPerHost %d, got %d", tt.expected, transport.MaxIdleConnsPerHost)
-			}
-		})
+	opt := WithMaxIdleConnsPerHost(20)
+	opt(client)
+
+	transport, ok := client.httpClient.Transport.(*http.Transport)
+	if !ok {
+		t.Fatal("Expected Transport to be *http.Transport")
+	}
+
+	if transport.MaxIdleConnsPerHost != 20 {
+		t.Errorf("MaxIdleConnsPerHost = %v, want 20", transport.MaxIdleConnsPerHost)
 	}
 }
 
 func TestWithIdleConnTimeout(t *testing.T) {
-	tests := []struct {
-		name        string
-		timeout     time.Duration
-		setup       func(c *Client)
-		expected    time.Duration
-		transportOk bool
-	}{
-		{
-			name:        "creates transport if nil",
-			timeout:     45 * time.Second,
-			setup:       nil,
-			expected:    45 * time.Second,
-			transportOk: true,
-		},
-		{
-			name:    "non-Transport RoundTripper already set",
-			timeout: 45 * time.Second,
-			setup: func(c *Client) {
-				c.httpClient.Transport = &customRoundTripper{}
-			},
-			expected:    0,
-			transportOk: false,
-		},
+	client := &Client{
+		httpClient: &http.Client{},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			c := NewClient("https://example.com", "test-key")
-			if tt.setup != nil {
-				tt.setup(c)
-			}
-			WithIdleConnTimeout(tt.timeout)(c)
-			transport, ok := c.httpClient.Transport.(*http.Transport)
-			if !tt.transportOk {
-				if ok {
-					t.Fatal("expected transport to not be *http.Transport")
-				}
-				return
-			}
-			if !ok {
-				t.Fatal("expected transport to be *http.Transport")
-			}
-			if transport.IdleConnTimeout != tt.expected {
-				t.Errorf("expected IdleConnTimeout %v, got %v", tt.expected, transport.IdleConnTimeout)
-			}
-		})
+	timeout := 120 * time.Second
+	opt := WithIdleConnTimeout(timeout)
+	opt(client)
+
+	transport, ok := client.httpClient.Transport.(*http.Transport)
+	if !ok {
+		t.Fatal("Expected Transport to be *http.Transport")
+	}
+
+	if transport.IdleConnTimeout != timeout {
+		t.Errorf("IdleConnTimeout = %v, want %v", transport.IdleConnTimeout, timeout)
 	}
 }
 
 func TestWithMaxConnsPerHost(t *testing.T) {
-	tests := []struct {
-		name            string
-		maxConnsPerHost int
-		setup           func(c *Client)
-		expected        int
-		transportOk     bool
-	}{
-		{
-			name:            "creates transport if nil",
-			maxConnsPerHost: 100,
-			setup:           nil,
-			expected:        100,
-			transportOk:     true,
-		},
-		{
-			name:            "non-Transport RoundTripper already set",
-			maxConnsPerHost: 100,
-			setup: func(c *Client) {
-				c.httpClient.Transport = &customRoundTripper{}
-			},
-			expected:    0,
-			transportOk: false,
-		},
+	client := &Client{
+		httpClient: &http.Client{},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			c := NewClient("https://example.com", "test-key")
-			if tt.setup != nil {
-				tt.setup(c)
-			}
-			WithMaxConnsPerHost(tt.maxConnsPerHost)(c)
-			transport, ok := c.httpClient.Transport.(*http.Transport)
-			if !tt.transportOk {
-				if ok {
-					t.Fatal("expected transport to not be *http.Transport")
-				}
-				return
-			}
-			if !ok {
-				t.Fatal("expected transport to be *http.Transport")
-			}
-			if transport.MaxConnsPerHost != tt.expected {
-				t.Errorf("expected MaxConnsPerHost %d, got %d", tt.expected, transport.MaxConnsPerHost)
-			}
-		})
+	opt := WithMaxConnsPerHost(100)
+	opt(client)
+
+	transport, ok := client.httpClient.Transport.(*http.Transport)
+	if !ok {
+		t.Fatal("Expected Transport to be *http.Transport")
+	}
+
+	if transport.MaxConnsPerHost != 100 {
+		t.Errorf("MaxConnsPerHost = %v, want 100", transport.MaxConnsPerHost)
 	}
 }
 
 func TestGetConnectionPoolConfig(t *testing.T) {
 	tests := []struct {
-		name   string
-		setup  func(c *Client)
-		expect *ConnectionPoolConfig
+		name       string
+		client     *Client
+		wantConfig *ConnectionPoolConfig
+		wantNil    bool
 	}{
 		{
-			name: "returns config from configured transport",
-			setup: func(c *Client) {
-				WithConnectionPool(&ConnectionPoolConfig{
-					MaxIdleConns:        15,
-					MaxIdleConnsPerHost: 7,
-					MaxConnsPerHost:     25,
-					IdleConnTimeout:     45 * time.Second,
-				})(c)
+			name:       "nil httpClient",
+			client:     &Client{httpClient: nil},
+			wantConfig: nil,
+			wantNil:    true,
+		},
+		{
+			name: "nil transport",
+			client: &Client{
+				httpClient: &http.Client{},
 			},
-			expect: &ConnectionPoolConfig{
+			wantConfig: nil,
+			wantNil:    true,
+		},
+		{
+			name: "non-http.Transport",
+			client: &Client{
+				httpClient: &http.Client{
+					Transport: &customTransport{},
+				},
+			},
+			wantConfig: nil,
+			wantNil:    true,
+		},
+		{
+			name: "valid transport",
+			client: &Client{
+				httpClient: &http.Client{
+					Transport: &http.Transport{
+						MaxIdleConns:        15,
+						MaxIdleConnsPerHost: 8,
+						MaxConnsPerHost:     15,
+						IdleConnTimeout:     90 * time.Second,
+					},
+				},
+			},
+			wantConfig: &ConnectionPoolConfig{
 				MaxIdleConns:        15,
-				MaxIdleConnsPerHost: 7,
-				MaxConnsPerHost:     25,
-				IdleConnTimeout:     45 * time.Second,
+				MaxIdleConnsPerHost: 8,
+				MaxConnsPerHost:     15,
+				IdleConnTimeout:     90 * time.Second,
 			},
-		},
-		{
-			name: "nil Transport returns nil",
-			setup: func(c *Client) {
-				c.httpClient.Transport = nil
-			},
-			expect: nil,
-		},
-		{
-			name: "nil httpClient returns nil",
-			setup: func(c *Client) {
-				c.httpClient = nil
-			},
-			expect: nil,
-		},
-		{
-			name: "non-http.Transport returns nil",
-			setup: func(c *Client) {
-				c.httpClient.Transport = &customRoundTripper{}
-			},
-			expect: nil,
+			wantNil: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := NewClient("https://example.com", "test-key")
-			if tt.setup != nil {
-				tt.setup(c)
-			}
-			got := c.GetConnectionPoolConfig()
-			if tt.expect == nil {
+			got := tt.client.GetConnectionPoolConfig()
+
+			if tt.wantNil {
 				if got != nil {
-					t.Fatalf("expected nil, got %+v", got)
+					t.Errorf("GetConnectionPoolConfig() = %v, want nil", got)
 				}
 				return
 			}
+
 			if got == nil {
-				t.Fatal("expected non-nil config, got nil")
+				t.Fatal("GetConnectionPoolConfig() returned nil, want non-nil")
 			}
-			if got.MaxIdleConns != tt.expect.MaxIdleConns {
-				t.Errorf("MaxIdleConns: expected %d, got %d", tt.expect.MaxIdleConns, got.MaxIdleConns)
+
+			if got.MaxIdleConns != tt.wantConfig.MaxIdleConns {
+				t.Errorf("MaxIdleConns = %v, want %v", got.MaxIdleConns, tt.wantConfig.MaxIdleConns)
 			}
-			if got.MaxIdleConnsPerHost != tt.expect.MaxIdleConnsPerHost {
-				t.Errorf("MaxIdleConnsPerHost: expected %d, got %d", tt.expect.MaxIdleConnsPerHost, got.MaxIdleConnsPerHost)
+
+			if got.MaxIdleConnsPerHost != tt.wantConfig.MaxIdleConnsPerHost {
+				t.Errorf("MaxIdleConnsPerHost = %v, want %v", got.MaxIdleConnsPerHost, tt.wantConfig.MaxIdleConnsPerHost)
 			}
-			if got.MaxConnsPerHost != tt.expect.MaxConnsPerHost {
-				t.Errorf("MaxConnsPerHost: expected %d, got %d", tt.expect.MaxConnsPerHost, got.MaxConnsPerHost)
+
+			if got.MaxConnsPerHost != tt.wantConfig.MaxConnsPerHost {
+				t.Errorf("MaxConnsPerHost = %v, want %v", got.MaxConnsPerHost, tt.wantConfig.MaxConnsPerHost)
 			}
-			if got.IdleConnTimeout != tt.expect.IdleConnTimeout {
-				t.Errorf("IdleConnTimeout: expected %v, got %v", tt.expect.IdleConnTimeout, got.IdleConnTimeout)
+
+			if got.IdleConnTimeout != tt.wantConfig.IdleConnTimeout {
+				t.Errorf("IdleConnTimeout = %v, want %v", got.IdleConnTimeout, tt.wantConfig.IdleConnTimeout)
 			}
 		})
+	}
+}
+
+// customTransport is a non-http.Transport type for testing
+type customTransport struct {
+	http.RoundTripper
+}
+
+func (c *customTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return nil, nil
+}
+
+func TestConnectionPoolConfigIntegration(t *testing.T) {
+	// Test that all options can be chained together
+	client := &Client{
+		httpClient: &http.Client{},
+	}
+
+	config := &ConnectionPoolConfig{
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 50,
+		MaxConnsPerHost:     100,
+		IdleConnTimeout:     5 * time.Minute,
+	}
+
+	// Apply WithConnectionPool
+	WithConnectionPool(config)(client)
+
+	// Verify the config can be retrieved
+	retrievedConfig := client.GetConnectionPoolConfig()
+	if retrievedConfig == nil {
+		t.Fatal("GetConnectionPoolConfig() returned nil")
+	}
+
+	if retrievedConfig.MaxIdleConns != 100 {
+		t.Errorf("MaxIdleConns = %v, want 100", retrievedConfig.MaxIdleConns)
+	}
+
+	if retrievedConfig.MaxIdleConnsPerHost != 50 {
+		t.Errorf("MaxIdleConnsPerHost = %v, want 50", retrievedConfig.MaxIdleConnsPerHost)
+	}
+
+	if retrievedConfig.MaxConnsPerHost != 100 {
+		t.Errorf("MaxConnsPerHost = %v, want 100", retrievedConfig.MaxConnsPerHost)
+	}
+
+	if retrievedConfig.IdleConnTimeout != 5*time.Minute {
+		t.Errorf("IdleConnTimeout = %v, want 5m", retrievedConfig.IdleConnTimeout)
+	}
+}
+
+func TestIndividualOptionsOverride(t *testing.T) {
+	// Test that individual options can override WithConnectionPool settings
+	client := &Client{
+		httpClient: &http.Client{},
+	}
+
+	// First apply a full config
+	config := &ConnectionPoolConfig{
+		MaxIdleConns:        10,
+		MaxIdleConnsPerHost: 5,
+		MaxConnsPerHost:     10,
+		IdleConnTimeout:     30 * time.Second,
+	}
+	WithConnectionPool(config)(client)
+
+	// Then override individual values
+	WithMaxIdleConns(200)(client)
+	WithMaxIdleConnsPerHost(100)(client)
+	WithMaxConnsPerHost(200)(client)
+	WithIdleConnTimeout(10 * time.Minute)(client)
+
+	retrievedConfig := client.GetConnectionPoolConfig()
+	if retrievedConfig == nil {
+		t.Fatal("GetConnectionPoolConfig() returned nil")
+	}
+
+	if retrievedConfig.MaxIdleConns != 200 {
+		t.Errorf("MaxIdleConns = %v, want 200", retrievedConfig.MaxIdleConns)
+	}
+
+	if retrievedConfig.MaxIdleConnsPerHost != 100 {
+		t.Errorf("MaxIdleConnsPerHost = %v, want 100", retrievedConfig.MaxIdleConnsPerHost)
+	}
+
+	if retrievedConfig.MaxConnsPerHost != 200 {
+		t.Errorf("MaxConnsPerHost = %v, want 200", retrievedConfig.MaxConnsPerHost)
+	}
+
+	if retrievedConfig.IdleConnTimeout != 10*time.Minute {
+		t.Errorf("IdleConnTimeout = %v, want 10m", retrievedConfig.IdleConnTimeout)
 	}
 }

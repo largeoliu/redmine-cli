@@ -63,7 +63,7 @@ func TestNewMockServer(t *testing.T) {
 		defer mock.Close()
 
 		// Register a simple handler
-		mock.Handle("/test", func(w http.ResponseWriter, r *http.Request) {
+		mock.Handle("/test", func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte("OK"))
 		})
@@ -117,7 +117,7 @@ func TestMockServer_Close(t *testing.T) {
 	t.Run("close_after_requests", func(t *testing.T) {
 		mock := NewMockServer(t)
 
-		mock.Handle("/test", func(w http.ResponseWriter, r *http.Request) {
+		mock.Handle("/test", func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})
 
@@ -139,7 +139,7 @@ func TestMockServer_Handle(t *testing.T) {
 		mock := NewMockServer(t)
 		defer mock.Close()
 
-		mock.Handle("/path", func(w http.ResponseWriter, r *http.Request) {
+		mock.Handle("/path", func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte("handled"))
 		})
@@ -220,15 +220,15 @@ func TestMockServer_Handle(t *testing.T) {
 		mock := NewMockServer(t)
 		defer mock.Close()
 
-		mock.Handle("/path1", func(w http.ResponseWriter, r *http.Request) {
+		mock.Handle("/path1", func(w http.ResponseWriter, _ *http.Request) {
 			w.Write([]byte("path1"))
 		})
 
-		mock.Handle("/path2", func(w http.ResponseWriter, r *http.Request) {
+		mock.Handle("/path2", func(w http.ResponseWriter, _ *http.Request) {
 			w.Write([]byte("path2"))
 		})
 
-		mock.Handle("/path3", func(w http.ResponseWriter, r *http.Request) {
+		mock.Handle("/path3", func(w http.ResponseWriter, _ *http.Request) {
 			w.Write([]byte("path3"))
 		})
 
@@ -286,7 +286,7 @@ func TestMockServer_Handle(t *testing.T) {
 		mock := NewMockServer(t)
 		defer mock.Close()
 
-		mock.Handle("/headers", func(w http.ResponseWriter, r *http.Request) {
+		mock.Handle("/headers", func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("X-Custom-Header", "custom-value")
 			w.Header().Set("X-Another-Header", "another-value")
 			w.WriteHeader(http.StatusOK)
@@ -326,7 +326,7 @@ func TestMockServer_Handle(t *testing.T) {
 			expectedCode := code
 
 			mock.Handle(path, func(expectedCode int) http.HandlerFunc {
-				return func(w http.ResponseWriter, r *http.Request) {
+				return func(w http.ResponseWriter, _ *http.Request) {
 					w.WriteHeader(expectedCode)
 				}
 			}(expectedCode))
@@ -840,7 +840,7 @@ func TestMockServer_Integration(t *testing.T) {
 		mock := NewMockServer(t)
 		defer mock.Close()
 
-		mock.Handle("/concurrent", func(w http.ResponseWriter, r *http.Request) {
+		mock.Handle("/concurrent", func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte("OK"))
 		})
@@ -929,7 +929,7 @@ func TestMockServer_EdgeCases(t *testing.T) {
 		mock := NewMockServer(t)
 		defer mock.Close()
 
-		mock.Handle("/special%20path", func(w http.ResponseWriter, r *http.Request) {
+		mock.Handle("/special%20path", func(w http.ResponseWriter, _ *http.Request) {
 			w.Write([]byte("OK"))
 		})
 
@@ -948,7 +948,7 @@ func TestMockServer_EdgeCases(t *testing.T) {
 		mock := NewMockServer(t)
 		defer mock.Close()
 
-		mock.Handle("/", func(w http.ResponseWriter, r *http.Request) {
+		mock.Handle("/", func(w http.ResponseWriter, _ *http.Request) {
 			w.Write([]byte("root"))
 		})
 
@@ -968,7 +968,7 @@ func TestMockServer_EdgeCases(t *testing.T) {
 		mock := NewMockServer(t)
 		defer mock.Close()
 
-		mock.Handle("/a/b/c/d/e", func(w http.ResponseWriter, r *http.Request) {
+		mock.Handle("/a/b/c/d/e", func(w http.ResponseWriter, _ *http.Request) {
 			w.Write([]byte("nested"))
 		})
 
@@ -1052,15 +1052,15 @@ func TestMockServer_MultipleHandlers(t *testing.T) {
 		defer mock.Close()
 
 		// Register multiple handlers with different paths
-		mock.Handle("/handler1", func(w http.ResponseWriter, r *http.Request) {
+		mock.Handle("/handler1", func(w http.ResponseWriter, _ *http.Request) {
 			w.Write([]byte("handler1"))
 		})
 
-		mock.Handle("/handler2", func(w http.ResponseWriter, r *http.Request) {
+		mock.Handle("/handler2", func(w http.ResponseWriter, _ *http.Request) {
 			w.Write([]byte("handler2"))
 		})
 
-		mock.Handle("/handler3", func(w http.ResponseWriter, r *http.Request) {
+		mock.Handle("/handler3", func(w http.ResponseWriter, _ *http.Request) {
 			w.Write([]byte("handler3"))
 		})
 
@@ -1123,7 +1123,7 @@ func TestMockServer_HandlePrefix(t *testing.T) {
 		mock := NewMockServer(t)
 		defer mock.Close()
 
-		mock.HandlePrefix("/api", func(w http.ResponseWriter, r *http.Request) {
+		mock.HandlePrefix("/api", func(w http.ResponseWriter, _ *http.Request) {
 			w.Write([]byte("matched"))
 		})
 
@@ -1197,7 +1197,7 @@ func TestMockServer_HandlePrefix(t *testing.T) {
 		mock := NewMockServer(t)
 		defer mock.Close()
 
-		mock.HandlePrefix("/api", func(w http.ResponseWriter, r *http.Request) {
+		mock.HandlePrefix("/api", func(w http.ResponseWriter, _ *http.Request) {
 			w.Write([]byte("api"))
 		})
 
@@ -1216,11 +1216,11 @@ func TestMockServer_HandlePrefix(t *testing.T) {
 		mock := NewMockServer(t)
 		defer mock.Close()
 
-		mock.HandlePrefix("/api/v1", func(w http.ResponseWriter, r *http.Request) {
+		mock.HandlePrefix("/api/v1", func(w http.ResponseWriter, _ *http.Request) {
 			w.Write([]byte("v1"))
 		})
 
-		mock.HandlePrefix("/api/v2", func(w http.ResponseWriter, r *http.Request) {
+		mock.HandlePrefix("/api/v2", func(w http.ResponseWriter, _ *http.Request) {
 			w.Write([]byte("v2"))
 		})
 
@@ -1251,7 +1251,7 @@ func TestMockServer_HandlePrefix(t *testing.T) {
 		mock := NewMockServer(t)
 		defer mock.Close()
 
-		mock.HandlePrefix("/api/v1/projects", func(w http.ResponseWriter, r *http.Request) {
+		mock.HandlePrefix("/api/v1/projects", func(w http.ResponseWriter, _ *http.Request) {
 			w.Write([]byte("projects"))
 		})
 
@@ -1271,7 +1271,7 @@ func TestMockServer_HandlePrefix(t *testing.T) {
 		mock := NewMockServer(t)
 		defer mock.Close()
 
-		mock.HandlePrefix("/api/", func(w http.ResponseWriter, r *http.Request) {
+		mock.HandlePrefix("/api/", func(w http.ResponseWriter, _ *http.Request) {
 			w.Write([]byte("trailing-slash"))
 		})
 

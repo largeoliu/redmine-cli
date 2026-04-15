@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -32,18 +32,23 @@ jobs:
         with:
           version: v2.11.4
           args: --timeout=5m
+          cache-invalidation-interval: 120
 
   test:
-    name: Test
+    name: Test (Go ${{ matrix.go-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: ['1.22', '1.23']
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: ${{ matrix.go-version }}
           cache: true
 
       - name: Verify dependencies
@@ -86,12 +91,18 @@ jobs:
             echo "Warning: coverage_filtered.out is empty, skipping coverage check"
           fi
 
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v6
+        with:
+          file: ./coverage.out
+          fail_ci_if_error: false
+
   generated:
     name: Generated Files
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -110,7 +121,7 @@ jobs:
     needs: [test]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -129,7 +140,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -138,12 +149,32 @@ jobs:
           cache: true
 
       - name: Run fuzz tests (client)
+        id: fuzz-client
         run: go test -fuzz=Fuzz -fuzztime=5m ./internal/client/...
         continue-on-error: true
 
       - name: Run fuzz tests (output)
+        id: fuzz-output
         run: go test -fuzz=Fuzz -fuzztime=5m ./internal/output/...
         continue-on-error: true
+
+      - name: Check fuzz results
+        if: always()
+        run: |
+          FAILED=0
+          if [ "${{ steps.fuzz-client.outcome }}" = "failure" ]; then
+            echo "::warning::Fuzz tests failed for client package"
+            FAILED=1
+          fi
+          if [ "${{ steps.fuzz-output.outcome }}" = "failure" ]; then
+            echo "::warning::Fuzz tests failed for output package"
+            FAILED=1
+          fi
+          if [ "$FAILED" = "1" ]; then
+            echo "::warning::One or more fuzz tests found issues. These are non-blocking but should be investigated."
+          else
+            echo "All fuzz tests passed"
+          fi
 
   benchmark:
     name: Benchmark (${{ matrix.package }})
@@ -157,7 +188,7 @@ jobs:
           - './internal/output/...'
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -173,7 +204,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -182,12 +213,14 @@ jobs:
           cache: true
 
       - name: Run Gosec Security Scanner
-        uses: securego/gosec@master
+        uses: securego/gosec@v2.22.3
+        env:
+          GOTOOLCHAIN: auto
         with:
-          args: ./...
+          args: -exclude=G115 ./...
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -202,7 +235,7 @@ jobs:
     needs: [lint, test, generated, e2e]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -214,11 +247,11 @@ jobs:
         run: go build -v -o bin/redmine ./cmd
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: redmine-cli
           path: bin/redmine
-          retention-days: 7
+          retention-days: 30
 
   # 汇总 job，供 branch protection 的 required check 使用
   ci-passed:

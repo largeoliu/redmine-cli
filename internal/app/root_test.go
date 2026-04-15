@@ -343,6 +343,11 @@ func TestRootCommandRunWithHelp(t *testing.T) {
 }
 
 func TestResolveClientWithFlags(t *testing.T) {
+	// Create a temp config directory to ensure no existing config interferes
+	tmpDir := t.TempDir()
+	os.Setenv("REDMINE_CONFIG_DIR", tmpDir)
+	defer os.Unsetenv("REDMINE_CONFIG_DIR")
+
 	tests := []struct {
 		name    string
 		flags   *GlobalFlags
@@ -872,7 +877,7 @@ func TestWriteOutputWithJQError(t *testing.T) {
 	}
 }
 
-func TestWriteOutputSelectFieldsError(t *testing.T) {
+func TestWriteOutputSelectFieldsWithMap(t *testing.T) {
 	flags := &GlobalFlags{
 		Format: "json",
 		Fields: "id,name",
