@@ -1,3 +1,5 @@
+version: 2
+
 project_name: redmine
 
 before:
@@ -24,11 +26,13 @@ builds:
       - -X main.date={{.Date}}
 
 archives:
-  - format: tar.gz
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+  - formats:
+      - tar.gz
+    name_template: "redmine-cli_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
     files:
       - README.md
       - LICENSE*
@@ -52,25 +56,4 @@ release:
     name: redmine-cli
   draft: false
   prerelease: auto
-  overwrite: true
-
-npm:
-  - name: redminectl
-    registry: npmjs
-    token: "{{ .Env.NPM_TOKEN }}"
-
-brews:
-  - name: redmine-cli
-    repository:
-      owner: largeoliu
-      name: homebrew-tap
-      branch: main
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    directory: Formula
-    homepage: "https://github.com/largeoliu/redmine-cli"
-    description: "AI Agent friendly Redmine CLI tool"
-    license: "MIT"
-    test: |
-      system "#{bin}/redmine version"
-    install: |
-      bin.install "redmine"
+  replace_existing_artifacts: true

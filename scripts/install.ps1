@@ -6,6 +6,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $REPO = "largeoliu/redmine-cli"
+$ASSET_NAME_PREFIX = "redmine-cli"
 $BINARY_NAME = "redmine"
 
 if (-not $InstallDir) {
@@ -75,7 +76,7 @@ function Download-Binary {
         [string]$Arch
     )
     
-    $archiveName = "${BINARY_NAME}_$($Version.Substring(1))_${OS}_${Arch}.zip"
+    $archiveName = "${ASSET_NAME_PREFIX}_$($Version.Substring(1))_${OS}_${Arch}.zip"
     $downloadUrl = "https://github.com/$REPO/releases/download/$Version/$archiveName"
     
     Write-Info "Downloading $archiveName..."
