@@ -58,14 +58,23 @@ linters:
         linters:
           - dupl
           - gocyclo
+          - errcheck
+          - gosec
+          - revive
       - path: (^|/)test/e2e/
         linters:
           - dupl
           - gocyclo
+          - errcheck
+          - gosec
+          - revive
       - path: (^|/)test/integration/
         linters:
           - dupl
           - gocyclo
+          - errcheck
+          - gosec
+          - revive
 
 formatters:
   enable:
