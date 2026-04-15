@@ -3,15 +3,68 @@ package issues
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/largeoliu/redmine-cli/internal/errors"
 	"github.com/largeoliu/redmine-cli/internal/resources/helpers"
+	"github.com/largeoliu/redmine-cli/internal/resources/trackers"
 	"github.com/largeoliu/redmine-cli/internal/types"
 )
 
-// NewCommand creates a new issues command.
+type customFieldFlags struct {
+	Fields []string
+}
+
+func parseCustomFieldFlags(fields []string, tracker *trackers.Tracker) ([]CustomField, error) {
+	if len(fields) == 0 {
+		return nil, nil
+	}
+
+	cfMap := make(map[int]CustomField)
+
+	for _, f := range fields {
+		parts := strings.SplitN(f, ":", 3)
+		if len(parts) < 2 {
+			return nil, fmt.Errorf("invalid custom field format: %s (expected name:value or id:X:value)", f)
+		}
+
+		cf := CustomField{}
+		if parts[0] == "id" {
+			var id int
+			if _, err := fmt.Sscanf(parts[1], "%d", &id); err != nil {
+				return nil, fmt.Errorf("invalid custom field id: %s", parts[1])
+			}
+			cf.ID = id
+			cf.Value = parts[2]
+		} else {
+			if tracker == nil {
+				return nil, fmt.Errorf("tracker required to match custom field by name, use id:X:value format instead")
+			}
+			found := false
+			for _, tf := range tracker.CustomFields {
+				if tf.Name == parts[0] {
+					cf.ID = tf.ID
+					cf.Value = parts[1]
+					found = true
+					break
+				}
+			}
+			if !found {
+				return nil, fmt.Errorf("custom field not found: %s", parts[0])
+			}
+		}
+		cfMap[cf.ID] = cf
+	}
+
+	result := make([]CustomField, 0, len(cfMap))
+	for _, cf := range cfMap {
+		result = append(result, cf)
+	}
+	return result, nil
+}
+
 func NewCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "issue",
@@ -95,6 +148,7 @@ func newGetCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Com
 
 func newCreateCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Command {
 	req := &IssueCreateRequest{}
+	createFlags := &customFieldFlags{}
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a new issue",
@@ -105,13 +159,20 @@ func newCreateCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.
 			if req.Subject == "" {
 				return errors.NewValidation("subject is required")
 			}
-			if flags.DryRun {
-				helpers.DryRunCreate("issue", req)
-				return nil
-			}
 			c, err := resolver.ResolveClient(flags)
 			if err != nil {
 				return err
+			}
+			if len(createFlags.Fields) > 0 {
+				cfs, err := parseCustomFieldFlags(createFlags.Fields, nil)
+				if err != nil {
+					return err
+				}
+				req.CustomFields = cfs
+			}
+			if flags.DryRun {
+				helpers.DryRunCreate("issue", req)
+				return nil
 			}
 			result, err := NewClient(c).Create(cmd.Context(), req)
 			if err != nil {
@@ -133,11 +194,13 @@ func newCreateCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.
 	cmd.Flags().StringVar(&req.StartDate, "start-date", "", "Start date (YYYY-MM-DD)")
 	cmd.Flags().StringVar(&req.DueDate, "due-date", "", "Due date (YYYY-MM-DD)")
 	cmd.Flags().IntVar(&req.DoneRatio, "done-ratio", 0, "Done ratio (0-100)")
+	cmd.Flags().StringSliceVar(&createFlags.Fields, "custom-field", nil, "Custom field value (format: name:value or id:X:value, can be specified multiple times)")
 	return cmd
 }
 
 func newUpdateCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Command {
 	req := &IssueUpdateRequest{}
+	updateFlags := &customFieldFlags{}
 	cmd := &cobra.Command{
 		Use:   "update <id>",
 		Short: "Update an issue",
@@ -147,13 +210,20 @@ func newUpdateCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.
 			if err != nil {
 				return err
 			}
-			if flags.DryRun {
-				helpers.DryRunUpdate("issue", id, req)
-				return nil
-			}
 			c, err := resolver.ResolveClient(flags)
 			if err != nil {
 				return err
+			}
+			if len(updateFlags.Fields) > 0 {
+				cfs, err := parseCustomFieldFlags(updateFlags.Fields, nil)
+				if err != nil {
+					return err
+				}
+				req.CustomFields = cfs
+			}
+			if flags.DryRun {
+				helpers.DryRunUpdate("issue", id, req)
+				return nil
 			}
 			if err := NewClient(c).Update(cmd.Context(), id, req); err != nil {
 				return err
@@ -173,6 +243,7 @@ func newUpdateCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.
 	cmd.Flags().StringVar(&req.DueDate, "due-date", "", "Due date (YYYY-MM-DD)")
 	cmd.Flags().IntVar(&req.DoneRatio, "done-ratio", 0, "Done ratio (0-100)")
 	cmd.Flags().StringVar(&req.Notes, "notes", "", "Notes to add")
+	cmd.Flags().StringSliceVar(&updateFlags.Fields, "custom-field", nil, "Custom field value (format: name:value or id:X:value, can be specified multiple times)")
 	return cmd
 }
 
