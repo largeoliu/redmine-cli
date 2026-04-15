@@ -108,7 +108,7 @@ func promptCustomFields(tracker *trackers.Tracker, initialValues map[int]CustomF
 				}
 				fmt.Println()
 				fmt.Print("    Select: ")
-				fmt.Scanln(&input)
+				fmt.Scanln(&input) //nolint:errcheck
 				if input != "" {
 					idx, err := strconv.Atoi(input)
 					if err == nil && idx >= 1 && idx <= len(cf.PossibleValues) {
@@ -120,7 +120,7 @@ func promptCustomFields(tracker *trackers.Tracker, initialValues map[int]CustomF
 			}
 		case "bool":
 			fmt.Print("    (y/n): ")
-			fmt.Scanln(&input)
+			fmt.Scanln(&input) //nolint:errcheck
 			if input == "y" || input == "Y" {
 				values[cf.ID] = CustomField{ID: cf.ID, Value: "1"}
 			} else if input == "n" || input == "N" {
@@ -130,7 +130,7 @@ func promptCustomFields(tracker *trackers.Tracker, initialValues map[int]CustomF
 			}
 		case "date":
 			fmt.Printf("    Input (YYYY-MM-DD) [%s]: ", defaultVal)
-			fmt.Scanln(&input)
+			fmt.Scanln(&input) //nolint:errcheck
 			if input == "" && defaultVal != "" {
 				values[cf.ID] = CustomField{ID: cf.ID, Value: defaultVal}
 			} else if input != "" {
@@ -138,7 +138,7 @@ func promptCustomFields(tracker *trackers.Tracker, initialValues map[int]CustomF
 			}
 		default:
 			fmt.Printf("    Input [%s]: ", defaultVal)
-			fmt.Scanln(&input)
+			fmt.Scanln(&input) //nolint:errcheck
 			if input != "" {
 				values[cf.ID] = CustomField{ID: cf.ID, Value: input}
 			} else if hasCurrent {
