@@ -10,6 +10,10 @@ import (
 	"go.uber.org/goleak"
 )
 
+func TestMain(m *testing.M) {
+	LeakTestMain(m)
+}
+
 // TestLeakTestMain tests the LeakTestMain function
 // Note: LeakTestMain calls os.Exit() so we cannot directly test it.
 // The function is tested indirectly through the TestMain of this package.

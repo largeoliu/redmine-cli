@@ -730,3 +730,217 @@ func (r *errorReaderCloser) Read(_ []byte) (int, error) {
 func (r *errorReaderCloser) Close() error {
 	return nil
 }
+
+type closeErrorBody struct {
+	data     []byte
+	readErr  error
+	closeErr error
+}
+
+func (b *closeErrorBody) Read(p []byte) (int, error) {
+	if b.readErr != nil {
+		return 0, b.readErr
+	}
+	if len(b.data) == 0 {
+		return 0, io.EOF
+	}
+	n := copy(p, b.data)
+	b.data = b.data[n:]
+	return n, nil
+}
+
+func (b *closeErrorBody) Close() error {
+	return b.closeErr
+}
+
+type closeErrorTransport struct {
+	closeErr error
+}
+
+func (t *closeErrorTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     make(http.Header),
+		Body:       &closeErrorBody{data: []byte(`{}`), closeErr: t.closeErr},
+	}, nil
+}
+
+type serverErrorTransport struct {
+	statusCode int
+	closeErr   error
+}
+
+func (t *serverErrorTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: t.statusCode,
+		Header:     make(http.Header),
+		Body:       &closeErrorBody{data: []byte(`error`), closeErr: t.closeErr},
+	}, nil
+}
+
+func TestDoSingleRequestNewRequestError(t *testing.T) {
+	c := NewClient("https://example.com", "test-key")
+	err := c.doSingleRequest(context.Background(), "INVALID METHOD", "/test", nil, nil)
+	if err == nil {
+		t.Fatal("expected error for invalid HTTP method, got nil")
+	}
+	var appErr *errors.Error
+	if !errors.As(err, &appErr) {
+		t.Fatalf("expected *errors.Error, got %T", err)
+	}
+	if appErr.Category != errors.CategoryInternal {
+		t.Errorf("expected category internal, got %s", appErr.Category)
+	}
+}
+
+func TestDoSingleRequestCloseError(t *testing.T) {
+	closeErr := stderrors.New("close error")
+	transport := &closeErrorTransport{closeErr: closeErr}
+	httpClient := &http.Client{Transport: transport}
+
+	c := NewClient("https://example.com", "test-key", WithHTTPClient(httpClient))
+	err := c.doSingleRequest(context.Background(), http.MethodGet, "/test", nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestPingInvalidURL(t *testing.T) {
+	c := NewClient("https://example.com", "test-key")
+	c.mu.Lock()
+	c.baseURL = "://invalid"
+	c.mu.Unlock()
+
+	err := c.Ping(context.Background())
+	if err == nil {
+		t.Fatal("expected error for invalid URL, got nil")
+	}
+	var appErr *errors.Error
+	if !errors.As(err, &appErr) {
+		t.Fatalf("expected *errors.Error, got %T", err)
+	}
+	if appErr.Category != errors.CategoryNetwork {
+		t.Errorf("expected category network, got %s", appErr.Category)
+	}
+}
+
+func TestPingUnreachable(t *testing.T) {
+	c := NewClient("http://invalid-host-that-does-not-exist.example", "test-key")
+	err := c.Ping(context.Background())
+	if err == nil {
+		t.Fatal("expected error for unreachable host, got nil")
+	}
+	var appErr *errors.Error
+	if !errors.As(err, &appErr) {
+		t.Fatalf("expected *errors.Error, got %T", err)
+	}
+	if appErr.Category != errors.CategoryNetwork {
+		t.Errorf("expected category network, got %s", appErr.Category)
+	}
+}
+
+func TestRetryExhausted(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	c := NewClient(server.URL, "test-key", WithRetry(2, 1*time.Millisecond, 10*time.Millisecond))
+	err := c.Get(context.Background(), "/test.json", nil)
+	if err == nil {
+		t.Fatal("expected error after retries exhausted, got nil")
+	}
+	var appErr *errors.Error
+	if !errors.As(err, &appErr) {
+		t.Fatalf("expected *errors.Error, got %T", err)
+	}
+	if !appErr.Retryable {
+		t.Error("expected retryable error")
+	}
+	if attempts != 3 {
+		t.Errorf("expected 3 attempts (1 initial + 2 retries), got %d", attempts)
+	}
+}
+
+func TestRetryContextCancelledDuringDelay(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	c := NewClient(server.URL, "test-key", WithRetry(5, 5*time.Second, 10*time.Second))
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	err := c.Get(ctx, "/test.json", nil)
+	if err == nil {
+		t.Fatal("expected error due to context cancellation, got nil")
+	}
+	if ctx.Err() != context.DeadlineExceeded {
+		t.Errorf("expected context deadline exceeded, got %v", ctx.Err())
+	}
+}
+
+func TestRetryDelayShiftOverflow63(t *testing.T) {
+	c := NewClient("https://example.com", "test-key",
+		WithRetry(100, 1*time.Millisecond, 10*time.Second))
+
+	for attempt := 0; attempt <= 100; attempt++ {
+		delay := c.retryDelay(attempt)
+		if delay > 10*time.Second {
+			t.Errorf("delay %v exceeds maxDelay for attempt %d", delay, attempt)
+		}
+	}
+}
+
+func TestPingCloseError(t *testing.T) {
+	closeErr := stderrors.New("close error")
+	origTransport := http.DefaultTransport
+	http.DefaultTransport = &closeErrorTransport{closeErr: closeErr}
+	defer func() { http.DefaultTransport = origTransport }()
+
+	c := NewClient("https://example.com", "test-key")
+	err := c.Ping(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestPingCloseErrorWithServerError(t *testing.T) {
+	closeErr := stderrors.New("close error")
+	origTransport := http.DefaultTransport
+	http.DefaultTransport = &serverErrorTransport{statusCode: http.StatusInternalServerError, closeErr: closeErr}
+	defer func() { http.DefaultTransport = origTransport }()
+
+	c := NewClient("https://example.com", "test-key")
+	err := c.Ping(context.Background())
+	if err == nil {
+		t.Fatal("expected error for 500 status, got nil")
+	}
+}
+
+func TestDoSingleRequestCloseErrorWithBody(t *testing.T) {
+	closeErr := stderrors.New("close error")
+	transport := &closeErrorTransport{closeErr: closeErr}
+	httpClient := &http.Client{Transport: transport}
+
+	c := NewClient("https://example.com", "test-key", WithHTTPClient(httpClient))
+	err := c.doSingleRequest(context.Background(), http.MethodGet, "/test", nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDoSingleRequestCloseErrorServerErr(t *testing.T) {
+	closeErr := stderrors.New("close error")
+	transport := &serverErrorTransport{statusCode: http.StatusInternalServerError, closeErr: closeErr}
+	httpClient := &http.Client{Transport: transport}
+
+	c := NewClient("https://example.com", "test-key", WithRetry(0, 1*time.Millisecond, 10*time.Millisecond), WithHTTPClient(httpClient))
+	err := c.doSingleRequest(context.Background(), http.MethodGet, "/test", nil, nil)
+	if err == nil {
+		t.Fatal("expected error for 500 status, got nil")
+	}
+}

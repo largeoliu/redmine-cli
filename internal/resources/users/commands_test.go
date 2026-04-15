@@ -6,6 +6,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/largeoliu/redmine-cli/internal/client"
@@ -472,6 +473,451 @@ func TestDeleteCommand_DryRun(t *testing.T) {
 	resolver := &mockResolver{}
 
 	cmd := newDeleteCommand(flags, resolver)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestListCommand_APIError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleError("/users.json", http.StatusInternalServerError, "Internal Server Error")
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+	}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from API, got nil")
+	}
+}
+
+func TestListCommand_WriteOutputError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := UserList{
+		Users:      []User{{ID: 1, Login: "user1"}},
+		TotalCount: 1,
+	}
+	mock.HandleJSON("/users.json", response)
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return context.Canceled
+		},
+	}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from WriteOutput, got nil")
+	}
+}
+
+func TestGetCommand_ResolveClientError(t *testing.T) {
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return nil, context.Canceled
+		},
+	}
+
+	cmd := newGetCommand(flags, resolver)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from ResolveClient, got nil")
+	}
+}
+
+func TestGetCommand_APIError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleError("/users/1.json", http.StatusNotFound, "Not found")
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+	}
+
+	cmd := newGetCommand(flags, resolver)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from API, got nil")
+	}
+}
+
+func TestGetCommand_WithInclude(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := struct {
+		User User `json:"user"`
+	}{
+		User: User{
+			ID:        1,
+			Login:     "user1",
+			Firstname: "John",
+			Lastname:  "Doe",
+		},
+	}
+	mock.HandleJSON("/users/1.json", response)
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return nil
+		},
+	}
+
+	cmd := newGetCommand(flags, resolver)
+	cmd.SetArgs([]string{"1", "--include", "memberships,groups"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestGetCommand_WriteOutputError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := struct {
+		User User `json:"user"`
+	}{
+		User: User{
+			ID:        1,
+			Login:     "user1",
+			Firstname: "John",
+			Lastname:  "Doe",
+		},
+	}
+	mock.HandleJSON("/users/1.json", response)
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return context.Canceled
+		},
+	}
+
+	cmd := newGetCommand(flags, resolver)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from WriteOutput, got nil")
+	}
+}
+
+func TestGetCurrentCommand_APIError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleError("/users/current.json", http.StatusUnauthorized, "Unauthorized")
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+	}
+
+	cmd := newGetCurrentCommand(flags, resolver)
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from API, got nil")
+	}
+}
+
+func TestGetCurrentCommand_WriteOutputError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := struct {
+		User User `json:"user"`
+	}{
+		User: User{
+			ID:    1,
+			Login: "currentuser",
+		},
+	}
+	mock.HandleJSON("/users/current.json", response)
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return context.Canceled
+		},
+	}
+
+	cmd := newGetCurrentCommand(flags, resolver)
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from WriteOutput, got nil")
+	}
+}
+
+func TestCreateCommand_ResolveClientError(t *testing.T) {
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return nil, context.Canceled
+		},
+	}
+
+	cmd := newCreateCommand(flags, resolver)
+	cmd.SetArgs([]string{
+		"--login", "newuser",
+		"--firstname", "New",
+		"--lastname", "User",
+		"--mail", "new@example.com",
+		"--password", "password123",
+	})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from ResolveClient, got nil")
+	}
+}
+
+func TestCreateCommand_APIError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleError("/users.json", http.StatusForbidden, "Forbidden")
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+	}
+
+	cmd := newCreateCommand(flags, resolver)
+	cmd.SetArgs([]string{
+		"--login", "newuser",
+		"--firstname", "New",
+		"--lastname", "User",
+		"--mail", "new@example.com",
+		"--password", "password123",
+	})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from API, got nil")
+	}
+}
+
+func TestCreateCommand_WriteOutputError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := struct {
+		User User `json:"user"`
+	}{
+		User: User{
+			ID:    1,
+			Login: "newuser",
+		},
+	}
+	mock.HandleJSON("/users.json", response)
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return context.Canceled
+		},
+	}
+
+	cmd := newCreateCommand(flags, resolver)
+	cmd.SetArgs([]string{
+		"--login", "newuser",
+		"--firstname", "New",
+		"--lastname", "User",
+		"--mail", "new@example.com",
+		"--password", "password123",
+	})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from WriteOutput, got nil")
+	}
+}
+
+func TestUpdateCommand_ResolveClientError(t *testing.T) {
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return nil, context.Canceled
+		},
+	}
+
+	cmd := newUpdateCommand(flags, resolver)
+	cmd.SetArgs([]string{"1", "--firstname", "Updated"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from ResolveClient, got nil")
+	}
+}
+
+func TestUpdateCommand_APIError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleError("/users/1.json", http.StatusNotFound, "Not found")
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+	}
+
+	cmd := newUpdateCommand(flags, resolver)
+	cmd.SetArgs([]string{"1", "--firstname", "Updated"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from API, got nil")
+	}
+}
+
+func TestDeleteCommand_ResolveClientError(t *testing.T) {
+	flags := &types.GlobalFlags{Yes: true}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return nil, context.Canceled
+		},
+	}
+
+	cmd := newDeleteCommand(flags, resolver)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from ResolveClient, got nil")
+	}
+}
+
+func TestDeleteCommand_APIError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleError("/users/1.json", http.StatusNotFound, "Not found")
+
+	flags := &types.GlobalFlags{Yes: true}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+	}
+
+	cmd := newDeleteCommand(flags, resolver)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from API, got nil")
+	}
+}
+
+func TestDeleteCommand_ConfirmDecline(t *testing.T) {
+	flags := &types.GlobalFlags{Yes: false}
+	resolver := &mockResolver{}
+
+	input := "n\n"
+	r, w, _ := os.Pipe()
+	_, _ = w.WriteString(input)
+	w.Close()
+
+	oldStdin := os.Stdin
+	defer func() { os.Stdin = oldStdin }()
+	os.Stdin = r
+
+	var buf bytes.Buffer
+	cmd := newDeleteCommand(flags, resolver)
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDeleteCommand_ConfirmAccept(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.Handle("/users/1.json", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			t.Errorf("expected DELETE request, got %s", r.Method)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	flags := &types.GlobalFlags{Yes: false}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+	}
+
+	input := "y\n"
+	r, w, _ := os.Pipe()
+	_, _ = w.WriteString(input)
+	w.Close()
+
+	oldStdin := os.Stdin
+	defer func() { os.Stdin = oldStdin }()
+	os.Stdin = r
+
+	var buf bytes.Buffer
+	cmd := newDeleteCommand(flags, resolver)
+	cmd.SetOut(&buf)
 	cmd.SetArgs([]string{"1"})
 
 	err := cmd.Execute()

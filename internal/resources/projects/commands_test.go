@@ -644,3 +644,196 @@ func TestDeleteCommand_APIError(t *testing.T) {
 		t.Error("expected error from API, got nil")
 	}
 }
+
+func TestListCommand_WithInclude(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := ProjectList{
+		Projects: []Project{
+			{ID: 1, Name: "Project A", Identifier: "project-a"},
+		},
+		TotalCount: 1,
+	}
+	mock.HandleJSON("/projects.json", response)
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return nil
+		},
+	}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{"--include", "trackers"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestListCommand_WithOffset(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := ProjectList{
+		Projects:   []Project{},
+		TotalCount: 0,
+	}
+	mock.HandleJSON("/projects.json", response)
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return nil
+		},
+	}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{"--offset", "10"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestListCommand_WriteOutputError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := ProjectList{
+		Projects:   []Project{},
+		TotalCount: 0,
+	}
+	mock.HandleJSON("/projects.json", response)
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return context.Canceled
+		},
+	}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from WriteOutput, got nil")
+	}
+}
+
+func TestGetCommand_WithInclude(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := struct {
+		Project Project `json:"project"`
+	}{
+		Project: Project{
+			ID:         1,
+			Name:       "Project A",
+			Identifier: "project-a",
+		},
+	}
+	mock.HandleJSON("/projects/1.json", response)
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return nil
+		},
+	}
+
+	cmd := newGetCommand(flags, resolver)
+	cmd.SetArgs([]string{"1", "--include", "trackers"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestGetCommand_WriteOutputError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := struct {
+		Project Project `json:"project"`
+	}{
+		Project: Project{
+			ID:         1,
+			Name:       "Project A",
+			Identifier: "project-a",
+		},
+	}
+	mock.HandleJSON("/projects/1.json", response)
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return context.Canceled
+		},
+	}
+
+	cmd := newGetCommand(flags, resolver)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from WriteOutput, got nil")
+	}
+}
+
+func TestCreateCommand_WriteOutputError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := struct {
+		Project Project `json:"project"`
+	}{
+		Project: Project{
+			ID:         1,
+			Name:       "New Project",
+			Identifier: "new-project",
+		},
+	}
+	mock.HandleJSON("/projects.json", response)
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return context.Canceled
+		},
+	}
+
+	var buf bytes.Buffer
+	cmd := newCreateCommand(flags, resolver)
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"--name", "New Project", "--identifier", "new-project"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from WriteOutput, got nil")
+	}
+}

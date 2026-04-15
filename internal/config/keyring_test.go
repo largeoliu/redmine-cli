@@ -2,10 +2,13 @@
 package config
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/zalando/go-keyring"
 	"gopkg.in/yaml.v3"
 )
 
@@ -520,5 +523,352 @@ func TestFallbackKeyringDelete(t *testing.T) {
 	_, err = kr.Get(instanceName)
 	if err != ErrAPIKeyNotFound {
 		t.Errorf("expected ErrAPIKeyNotFound after delete, got %v", err)
+	}
+}
+
+func TestNewStoreWithKeyring(t *testing.T) {
+	dir := t.TempDir()
+	kr := &mockKeyring{
+		isAvailableFn: func() bool { return true },
+	}
+	store := NewStoreWithKeyring(dir, kr)
+	if store == nil {
+		t.Fatal("NewStoreWithKeyring() returned nil")
+	}
+	if store.configDir != dir {
+		t.Errorf("configDir = %s, want %s", store.configDir, dir)
+	}
+	if store.keyring != kr {
+		t.Error("keyring not set correctly")
+	}
+
+	emptyStore := NewStoreWithKeyring("", kr)
+	if emptyStore.configDir != Dir() {
+		t.Errorf("empty dir: configDir = %s, want %s", emptyStore.configDir, Dir())
+	}
+}
+
+func TestStoreSaveInstanceWithKeyringAvailable(t *testing.T) {
+	dir := t.TempDir()
+	var capturedName, capturedKey string
+	kr := &mockKeyring{
+		isAvailableFn: func() bool { return true },
+		setFunc: func(instanceName, apiKey string) error {
+			capturedName = instanceName
+			capturedKey = apiKey
+			return nil
+		},
+	}
+	store := NewStoreWithKeyring(dir, kr)
+
+	err := store.SaveInstance("test-instance", Instance{
+		URL:    "https://example.com",
+		APIKey: "secret-key-123",
+	})
+	if err != nil {
+		t.Fatalf("SaveInstance failed: %v", err)
+	}
+
+	if capturedName != "test-instance" {
+		t.Errorf("keyring.Set name = %s, want test-instance", capturedName)
+	}
+	if capturedKey != "secret-key-123" {
+		t.Errorf("keyring.Set key = %s, want secret-key-123", capturedKey)
+	}
+
+	configPath := filepath.Join(dir, "config.yaml")
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("read config file failed: %v", err)
+	}
+	var fileCfg Config
+	if err := yaml.Unmarshal(data, &fileCfg); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if fileCfg.Instances["test-instance"].APIKey != "" {
+		t.Errorf("API key should be cleared in YAML, got %s", fileCfg.Instances["test-instance"].APIKey)
+	}
+}
+
+func TestStoreSaveInstanceKeyringSetError(t *testing.T) {
+	dir := t.TempDir()
+	setErr := errors.New("keyring set failed")
+	kr := &mockKeyring{
+		isAvailableFn: func() bool { return true },
+		setFunc: func(instanceName, apiKey string) error {
+			return setErr
+		},
+	}
+	store := NewStoreWithKeyring(dir, kr)
+
+	err := store.SaveInstance("test-instance", Instance{
+		URL:    "https://example.com",
+		APIKey: "secret-key-123",
+	})
+	if err != setErr {
+		t.Errorf("expected setErr, got %v", err)
+	}
+}
+
+func TestStoreDeleteInstanceKeyringError(t *testing.T) {
+	dir := t.TempDir()
+	delErr := errors.New("keyring delete failed")
+	kr := &mockKeyring{
+		isAvailableFn: func() bool { return true },
+		deleteFunc: func(instanceName string) error {
+			return delErr
+		},
+	}
+	store := NewStoreWithKeyring(dir, kr)
+
+	err := store.Save(&Config{
+		Default: "test-instance",
+		Instances: map[string]Instance{
+			"test-instance": {URL: "https://example.com"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Save failed: %v", err)
+	}
+
+	err = store.DeleteInstance("test-instance")
+	if err != delErr {
+		t.Errorf("expected delErr, got %v", err)
+	}
+}
+
+func TestStoreSaveMkdirAllError(t *testing.T) {
+	dir := t.TempDir()
+	fileAsDir := filepath.Join(dir, "blocked")
+	if err := os.WriteFile(fileAsDir, []byte("x"), 0600); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+	store := NewStoreWithKeyring(filepath.Join(fileAsDir, "sub", "dir"), &mockKeyring{})
+	cfg := DefaultConfig()
+	err := store.Save(cfg)
+	if err == nil {
+		t.Error("expected error when MkdirAll fails")
+	}
+}
+
+func TestStoreLoadReadFileError(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.MkdirAll(configPath, 0755); err != nil {
+		t.Fatalf("MkdirAll failed: %v", err)
+	}
+	store := NewStoreWithKeyring(dir, &mockKeyring{})
+	_, err := store.Load()
+	if err == nil {
+		t.Error("expected error when config.yaml is a directory")
+	}
+}
+
+func TestStoreSaveInstanceLoadError(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.MkdirAll(configPath, 0755); err != nil {
+		t.Fatalf("MkdirAll failed: %v", err)
+	}
+	store := NewStoreWithKeyring(dir, &mockKeyring{})
+	err := store.SaveInstance("test", Instance{URL: "https://example.com", APIKey: "key"})
+	if err == nil {
+		t.Error("expected error when Load fails in SaveInstance")
+	}
+}
+
+func TestStoreSetDefaultLoadError(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.MkdirAll(configPath, 0755); err != nil {
+		t.Fatalf("MkdirAll failed: %v", err)
+	}
+	store := NewStoreWithKeyring(dir, &mockKeyring{})
+	err := store.SetDefault("test")
+	if err == nil {
+		t.Error("expected error when Load fails in SetDefault")
+	}
+}
+
+func TestStoreDeleteInstanceLoadError(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.MkdirAll(configPath, 0755); err != nil {
+		t.Fatalf("MkdirAll failed: %v", err)
+	}
+	store := NewStoreWithKeyring(dir, &mockKeyring{})
+	err := store.DeleteInstance("test")
+	if err == nil {
+		t.Error("expected error when Load fails in DeleteInstance")
+	}
+}
+
+func TestStoreLoadWithKeyringAvailable(t *testing.T) {
+	dir := t.TempDir()
+	kr := &mockKeyring{
+		isAvailableFn: func() bool { return true },
+		getFunc: func(instanceName string) (string, error) {
+			if instanceName == "test-instance" {
+				return "resolved-from-keyring", nil
+			}
+			return "", ErrAPIKeyNotFound
+		},
+	}
+	store := NewStoreWithKeyring(dir, kr)
+
+	cfg := &Config{
+		Default: "test-instance",
+		Instances: map[string]Instance{
+			"test-instance": {URL: "https://example.com", APIKey: ""},
+		},
+	}
+	err := store.Save(cfg)
+	if err != nil {
+		t.Fatalf("Save failed: %v", err)
+	}
+
+	loaded, err := store.Load()
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	inst, ok := loaded.Instances["test-instance"]
+	if !ok {
+		t.Fatal("test-instance not found")
+	}
+	if inst.APIKey != "resolved-from-keyring" {
+		t.Errorf("API key = %s, want resolved-from-keyring", inst.APIKey)
+	}
+}
+
+func TestRealKeyringIsAvailableWithMock(t *testing.T) {
+	keyring.MockInit()
+	defer keyring.MockInit()
+
+	kr := &realKeyring{}
+	if !kr.IsAvailable() {
+		t.Error("realKeyring.IsAvailable() should return true with mock provider")
+	}
+}
+
+func TestRealKeyringGetSetDeleteWithMock(t *testing.T) {
+	keyring.MockInit()
+	defer keyring.MockInit()
+
+	kr := &realKeyring{}
+
+	err := kr.Set("mock-instance", "mock-api-key")
+	if err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+
+	got, err := kr.Get("mock-instance")
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if got != "mock-api-key" {
+		t.Errorf("Get = %s, want mock-api-key", got)
+	}
+
+	err = kr.Delete("mock-instance")
+	if err != nil {
+		t.Fatalf("Delete failed: %v", err)
+	}
+
+	_, err = kr.Get("mock-instance")
+	if err != ErrAPIKeyNotFound {
+		t.Errorf("expected ErrAPIKeyNotFound after delete, got %v", err)
+	}
+}
+
+func TestRealKeyringGetNonNotFoundError(t *testing.T) {
+	mockErr := errors.New("keyring internal error")
+	keyring.MockInitWithError(mockErr)
+	defer keyring.MockInit()
+
+	kr := &realKeyring{}
+	_, err := kr.Get("any-instance")
+	if err == nil {
+		t.Error("expected error, got nil")
+	}
+
+	expected := fmt.Sprintf("failed to get API key from keyring: %v", mockErr)
+	if err.Error() != expected {
+		t.Errorf("error = %q, want %q", err.Error(), expected)
+	}
+}
+
+func TestRealKeyringSetError(t *testing.T) {
+	mockErr := errors.New("keyring set error")
+	keyring.MockInitWithError(mockErr)
+	defer keyring.MockInit()
+
+	kr := &realKeyring{}
+	err := kr.Set("any-instance", "any-key")
+	if err == nil {
+		t.Error("expected error, got nil")
+	}
+
+	expected := fmt.Sprintf("failed to set API key to keyring: %v", mockErr)
+	if err.Error() != expected {
+		t.Errorf("error = %q, want %q", err.Error(), expected)
+	}
+}
+
+func TestRealKeyringDeleteNonNotFoundError(t *testing.T) {
+	mockErr := errors.New("keyring delete error")
+	keyring.MockInitWithError(mockErr)
+	defer keyring.MockInit()
+
+	kr := &realKeyring{}
+	err := kr.Delete("any-instance")
+	if err == nil {
+		t.Error("expected error, got nil")
+	}
+
+	expected := fmt.Sprintf("failed to delete API key from keyring: %v", mockErr)
+	if err.Error() != expected {
+		t.Errorf("error = %q, want %q", err.Error(), expected)
+	}
+}
+
+func TestNewKeyringFallbackWithMockError(t *testing.T) {
+	keyring.MockInitWithError(errors.New("unavailable"))
+	defer keyring.MockInit()
+
+	kr := NewKeyring()
+	if kr == nil {
+		t.Fatal("NewKeyring() returned nil")
+	}
+
+	_, ok := kr.(*fallbackKeyring)
+	if !ok {
+		t.Error("expected fallbackKeyring when keyring is unavailable")
+	}
+}
+
+func TestNewKeyringRealWithMock(t *testing.T) {
+	keyring.MockInit()
+	defer keyring.MockInit()
+
+	kr := NewKeyring()
+	if kr == nil {
+		t.Fatal("NewKeyring() returned nil")
+	}
+
+	_, ok := kr.(*realKeyring)
+	if !ok {
+		t.Error("expected realKeyring when keyring is available")
+	}
+}
+
+func TestRealKeyringDeleteNonExistentWithMock(t *testing.T) {
+	keyring.MockInit()
+	defer keyring.MockInit()
+
+	kr := &realKeyring{}
+	err := kr.Delete("non-existent-instance")
+	if err != ErrAPIKeyNotFound {
+		t.Errorf("expected ErrAPIKeyNotFound for non-existent key, got %v", err)
 	}
 }
