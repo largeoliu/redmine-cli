@@ -62,6 +62,8 @@ linters:
           - gosec
           - revive
           - govet
+          - misspell
+          - staticcheck
       - path: (^|/)test/e2e/
         linters:
           - dupl
@@ -70,6 +72,8 @@ linters:
           - gosec
           - revive
           - govet
+          - misspell
+          - staticcheck
       - path: (^|/)test/integration/
         linters:
           - dupl
@@ -78,6 +82,8 @@ linters:
           - gosec
           - revive
           - govet
+          - misspell
+          - staticcheck
 
 formatters:
   enable:
