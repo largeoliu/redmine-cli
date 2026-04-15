@@ -33,15 +33,32 @@ irm https://raw.githubusercontent.com/largeoliu/redmine-cli/master/scripts/insta
 npm install -g redminectl
 ```
 
+> **注意：** npm 包名为 `redminectl`，但安装后的命令为 `redmine`。
+
 ### 方式三：手动下载
 
-从 [GitHub Releases](https://github.com/largeoliu/redmine-cli/releases) 下载对应平台的预编译二进制。
+1. 访问 [GitHub Releases](https://github.com/largeoliu/redmine-cli/releases) 页面
+2. 根据您的平台下载对应的压缩包：
+   - **macOS**: `redmine-cli_<version>_darwin_amd64.tar.gz` (Intel) 或 `redmine-cli_<version>_darwin_arm64.tar.gz` (Apple Silicon)
+   - **Linux**: `redmine-cli_<version>_linux_amd64.tar.gz` (x64) 或 `redmine-cli_<version>_linux_arm64.tar.gz` (ARM64)
+   - **Windows**: `redmine-cli_<version>_windows_amd64.zip`
+3. 解压文件：
+   - macOS/Linux: `tar -xzf redmine-cli_<version>_<os>_<arch>.tar.gz`
+   - Windows: 使用文件资源管理器或 PowerShell 解压 `.zip` 文件
+4. 将解压后的 `redmine`（或 Windows 下的 `redmine.exe`）移动到 PATH 中的目录，例如：
+   - macOS/Linux: `sudo mv redmine /usr/local/bin/`
+   - Windows: 移动到 `C:\Windows\System32\` 或添加到 PATH 的目录
+5. macOS/Linux 用户需要添加可执行权限：`chmod +x /usr/local/bin/redmine`
 
 ### 方式四：从源码构建
 
+**前提条件：** 需要安装 Go 1.23 或更高版本。
+
 ```bash
-go install github.com/largeoliu/redmine-cli@latest
+go install github.com/largeoliu/redmine-cli/cmd@latest
 ```
+
+安装后的二进制文件位于 `$(go env GOPATH)/bin/redmine`，请确保该目录在您的 PATH 中。
 
 ## 快速开始
 
