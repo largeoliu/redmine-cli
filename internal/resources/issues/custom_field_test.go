@@ -2,6 +2,8 @@ package issues
 
 import (
 	"testing"
+
+	"github.com/largeoliu/redmine-cli/internal/resources/trackers"
 )
 
 func TestParseCustomFieldFlags_IDFormat(t *testing.T) {
@@ -51,6 +53,67 @@ func TestParseCustomFieldFlags_IDFormat(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := parseCustomFieldFlags(tt.flags, nil)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseCustomFieldFlags() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && !equalCustomFields(got, tt.want) {
+				t.Errorf("parseCustomFieldFlags() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseCustomFieldFlags_NameFormat(t *testing.T) {
+	tracker := &trackers.Tracker{
+		ID:   1,
+		Name: "Bug",
+		CustomFields: []trackers.TrackerCustomField{
+			{ID: 1, Name: "Severity", FieldFormat: "list"},
+			{ID: 2, Name: "Version", FieldFormat: "string"},
+		},
+	}
+
+	tests := []struct {
+		name    string
+		flags   []string
+		want    []CustomField
+		wantErr bool
+	}{
+		{
+			name:  "name format valid",
+			flags: []string{"Severity:High"},
+			want:  []CustomField{{ID: 1, Value: "High"}},
+		},
+		{
+			name:  "name format with multiple",
+			flags: []string{"Severity:Low", "Version:v2.0"},
+			want:  []CustomField{{ID: 1, Value: "Low"}, {ID: 2, Value: "v2.0"}},
+		},
+		{
+			name:    "name format not found",
+			flags:   []string{"UnknownField:value"},
+			wantErr: true,
+		},
+		{
+			name:    "name format with nil tracker",
+			flags:   []string{"Severity:High"},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var wantTracker *trackers.Tracker
+			if !tt.wantErr || (tt.name == "name format with nil tracker") {
+				if tt.name == "name format with nil tracker" {
+					wantTracker = nil
+				} else {
+					wantTracker = tracker
+				}
+			}
+
+			got, err := parseCustomFieldFlags(tt.flags, wantTracker)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseCustomFieldFlags() error = %v, wantErr %v", err, tt.wantErr)
 				return
