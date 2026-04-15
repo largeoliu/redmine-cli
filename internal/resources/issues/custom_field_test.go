@@ -109,11 +109,12 @@ func equalCustomFields(a, b []CustomField) bool {
 	if len(a) != len(b) {
 		return false
 	}
-	for i := range a {
-		if a[i].ID != b[i].ID {
-			return false
-		}
-		if a[i].Value != b[i].Value {
+	m := make(map[int]any)
+	for _, cf := range a {
+		m[cf.ID] = cf.Value
+	}
+	for _, cf := range b {
+		if m[cf.ID] != cf.Value {
 			return false
 		}
 	}
