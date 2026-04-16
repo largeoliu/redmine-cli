@@ -12,8 +12,8 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@v5
         with:
           release-type: go
-          default-branch: main
+          default-branch: master
           merge-mode: squash-merge
