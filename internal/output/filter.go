@@ -10,6 +10,9 @@ import (
 
 // ApplyJQ applies a jq expression to filter and transform JSON data.
 func ApplyJQ(w io.Writer, payload any, expr string) error {
+	if expr == "" {
+		expr = "."
+	}
 	query, err := gojq.Parse(expr)
 	if err != nil {
 		return err

@@ -6,6 +6,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/largeoliu/redmine-cli/internal/client"
@@ -373,6 +374,343 @@ func TestDeleteCommand_DryRun(t *testing.T) {
 	resolver := &mockResolver{}
 
 	cmd := newDeleteCommand(flags, resolver)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestListCommand_APIError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleError("/time_entries.json", http.StatusInternalServerError, "Internal Server Error")
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+	}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from API, got nil")
+	}
+}
+
+func TestListCommand_WriteOutputError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := TimeEntryList{
+		TimeEntries: []TimeEntry{},
+		TotalCount:  0,
+	}
+	mock.HandleJSON("/time_entries.json", response)
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return context.Canceled
+		},
+	}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from WriteOutput, got nil")
+	}
+}
+
+func TestGetCommand_ResolveClientError(t *testing.T) {
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return nil, context.Canceled
+		},
+	}
+
+	cmd := newGetCommand(flags, resolver)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from ResolveClient, got nil")
+	}
+}
+
+func TestGetCommand_APIError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleError("/time_entries/1.json", http.StatusNotFound, "Not found")
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+	}
+
+	cmd := newGetCommand(flags, resolver)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from API, got nil")
+	}
+}
+
+func TestGetCommand_WriteOutputError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := struct {
+		TimeEntry TimeEntry `json:"time_entry"`
+	}{
+		TimeEntry: TimeEntry{
+			ID:      1,
+			Hours:   2.5,
+			SpentOn: "2024-01-15",
+		},
+	}
+	mock.HandleJSON("/time_entries/1.json", response)
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return context.Canceled
+		},
+	}
+
+	cmd := newGetCommand(flags, resolver)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from WriteOutput, got nil")
+	}
+}
+
+func TestCreateCommand_ResolveClientError(t *testing.T) {
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return nil, context.Canceled
+		},
+	}
+
+	cmd := newCreateCommand(flags, resolver)
+	cmd.SetArgs([]string{"--issue-id", "10", "--hours", "2.5", "--spent-on", "2024-01-15"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from ResolveClient, got nil")
+	}
+}
+
+func TestCreateCommand_APIError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleError("/time_entries.json", http.StatusBadRequest, "Bad Request")
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+	}
+
+	cmd := newCreateCommand(flags, resolver)
+	cmd.SetArgs([]string{"--issue-id", "10", "--hours", "2.5", "--spent-on", "2024-01-15"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from API, got nil")
+	}
+}
+
+func TestCreateCommand_WriteOutputError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := struct {
+		TimeEntry TimeEntry `json:"time_entry"`
+	}{
+		TimeEntry: TimeEntry{
+			ID:      1,
+			Hours:   2.5,
+			SpentOn: "2024-01-15",
+		},
+	}
+	mock.HandleJSON("/time_entries.json", response)
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return context.Canceled
+		},
+	}
+
+	cmd := newCreateCommand(flags, resolver)
+	cmd.SetArgs([]string{"--issue-id", "10", "--hours", "2.5", "--spent-on", "2024-01-15"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from WriteOutput, got nil")
+	}
+}
+
+func TestUpdateCommand_ResolveClientError(t *testing.T) {
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return nil, context.Canceled
+		},
+	}
+
+	cmd := newUpdateCommand(flags, resolver)
+	cmd.SetArgs([]string{"1", "--hours", "3.0"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from ResolveClient, got nil")
+	}
+}
+
+func TestUpdateCommand_APIError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleError("/time_entries/1.json", http.StatusNotFound, "Not found")
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+	}
+
+	cmd := newUpdateCommand(flags, resolver)
+	cmd.SetArgs([]string{"1", "--hours", "3.0"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from API, got nil")
+	}
+}
+
+func TestDeleteCommand_ResolveClientError(t *testing.T) {
+	flags := &types.GlobalFlags{Yes: true}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return nil, context.Canceled
+		},
+	}
+
+	cmd := newDeleteCommand(flags, resolver)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from ResolveClient, got nil")
+	}
+}
+
+func TestDeleteCommand_APIError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleError("/time_entries/1.json", http.StatusNotFound, "Not found")
+
+	flags := &types.GlobalFlags{Yes: true}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+	}
+
+	cmd := newDeleteCommand(flags, resolver)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from API, got nil")
+	}
+}
+
+func TestDeleteCommand_ConfirmDecline(t *testing.T) {
+	flags := &types.GlobalFlags{Yes: false}
+	resolver := &mockResolver{}
+
+	input := "n\n"
+	r, w, _ := os.Pipe()
+	_, _ = w.WriteString(input)
+	w.Close()
+
+	oldStdin := os.Stdin
+	defer func() { os.Stdin = oldStdin }()
+	os.Stdin = r
+
+	var buf bytes.Buffer
+	cmd := newDeleteCommand(flags, resolver)
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDeleteCommand_ConfirmAccept(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.Handle("/time_entries/1.json", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			t.Errorf("expected DELETE request, got %s", r.Method)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	flags := &types.GlobalFlags{Yes: false}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+	}
+
+	input := "y\n"
+	r, w, _ := os.Pipe()
+	_, _ = w.WriteString(input)
+	w.Close()
+
+	oldStdin := os.Stdin
+	defer func() { os.Stdin = oldStdin }()
+	os.Stdin = r
+
+	var buf bytes.Buffer
+	cmd := newDeleteCommand(flags, resolver)
+	cmd.SetOut(&buf)
 	cmd.SetArgs([]string{"1"})
 
 	err := cmd.Execute()

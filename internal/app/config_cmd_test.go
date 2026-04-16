@@ -118,13 +118,11 @@ func TestConfigGetCommandExecution(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// 设置环境变量以使用临时目录
-	os.Setenv("REDMINE_CONFIG_DIR", tmpDir)
-	defer os.Unsetenv("REDMINE_CONFIG_DIR")
+	t.Setenv("REDMINE_CONFIG_DIR", tmpDir)
 
 	flags := &GlobalFlags{Format: "json"}
 	cmd := newConfigGetCommand(flags)
 
-	// 捕获 stdout
 	old := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w

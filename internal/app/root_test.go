@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -234,8 +235,7 @@ func TestSplitByComma(t *testing.T) {
 	}
 }
 
-func TestResolverInterface(t *testing.T) {
-	// 测试 resolver 实现 types.Resolver 接口
+func TestResolverInterface(_ *testing.T) {
 	var _ types.Resolver = &resolver{}
 }
 
@@ -343,6 +343,11 @@ func TestRootCommandRunWithHelp(t *testing.T) {
 }
 
 func TestResolveClientWithFlags(t *testing.T) {
+	// Create a temp config directory to ensure no existing config interferes
+	tmpDir := t.TempDir()
+	os.Setenv("REDMINE_CONFIG_DIR", tmpDir)
+	defer os.Unsetenv("REDMINE_CONFIG_DIR")
+
 	tests := []struct {
 		name    string
 		flags   *GlobalFlags
@@ -783,6 +788,151 @@ func TestNewRootCommandContext(t *testing.T) {
 	cmdCtx := root.Context()
 	if cmdCtx == nil {
 		t.Error("expected context to be set")
+	}
+}
+
+func TestResolveClientWithTimeoutAndRetries(t *testing.T) {
+	tmpDir := t.TempDir()
+	os.Setenv("REDMINE_CONFIG_DIR", tmpDir)
+	defer os.Unsetenv("REDMINE_CONFIG_DIR")
+
+	configContent := `default: prod
+instances:
+  prod:
+    url: https://prod.example.com
+    api_key: prod-key
+`
+	configFile := filepath.Join(tmpDir, "config.yaml")
+	if err := os.WriteFile(configFile, []byte(configContent), 0600); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	flags := &GlobalFlags{
+		Timeout: 10 * time.Second,
+		Retries: 5,
+	}
+	client, err := ResolveClient(flags)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if client == nil {
+		t.Error("expected client, got nil")
+	}
+}
+
+func TestResolveClientNoDefaultWithInstances(t *testing.T) {
+	tmpDir := t.TempDir()
+	os.Setenv("REDMINE_CONFIG_DIR", tmpDir)
+	defer os.Unsetenv("REDMINE_CONFIG_DIR")
+
+	configContent := `instances:
+  dev:
+    url: https://dev.example.com
+    api_key: dev-key
+`
+	configFile := filepath.Join(tmpDir, "config.yaml")
+	if err := os.WriteFile(configFile, []byte(configContent), 0600); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	flags := &GlobalFlags{}
+	_, err := ResolveClient(flags)
+	if err == nil {
+		t.Error("expected error for no default instance, got nil")
+	}
+	if !strings.Contains(err.Error(), "URL is required") {
+		t.Errorf("expected URL is required error, got %v", err)
+	}
+}
+
+type errorWriter struct{}
+
+func (w *errorWriter) Write(_ []byte) (int, error) {
+	return 0, fmt.Errorf("write error")
+}
+
+func TestWriteOutputWithWriterError(t *testing.T) {
+	flags := &GlobalFlags{
+		Format: "json",
+	}
+	payload := map[string]string{"test": "value"}
+
+	err := WriteOutput(&errorWriter{}, flags, payload)
+	if err == nil {
+		t.Error("expected error from writer, got nil")
+	}
+}
+
+func TestWriteOutputWithJQError(t *testing.T) {
+	flags := &GlobalFlags{
+		Format: "json",
+		JQ:     "invalid[",
+	}
+	payload := map[string]string{"test": "value"}
+
+	var buf bytes.Buffer
+	err := WriteOutput(&buf, flags, payload)
+	if err == nil {
+		t.Error("expected JQ parse error, got nil")
+	}
+}
+
+func TestWriteOutputSelectFieldsWithMap(t *testing.T) {
+	flags := &GlobalFlags{
+		Format: "json",
+		Fields: "id,name",
+	}
+	payload := map[string]any{
+		"id":   1,
+		"name": "test",
+	}
+
+	var buf bytes.Buffer
+	err := WriteOutput(&buf, flags, payload)
+	if err != nil {
+		t.Fatalf("SelectFields on map should not error: %v", err)
+	}
+}
+
+func TestWriteOutputSelectFieldsMarshalError(t *testing.T) {
+	flags := &GlobalFlags{
+		Format: "json",
+		Fields: "id",
+	}
+	ch := make(chan int)
+	payload := map[string]any{
+		"id": 1,
+		"ch": ch,
+	}
+
+	var buf bytes.Buffer
+	err := WriteOutput(&buf, flags, payload)
+	if err == nil {
+		t.Error("expected error from SelectFields with unmarshallable payload, got nil")
+	}
+}
+
+func TestResolverResolveClientError(t *testing.T) {
+	r := &resolver{}
+	flags := &types.GlobalFlags{}
+	_, err := r.ResolveClient(flags)
+	if err == nil {
+		t.Error("expected error for empty flags, got nil")
+	}
+}
+
+func TestResolverWriteOutputError(t *testing.T) {
+	r := &resolver{}
+	flags := &types.GlobalFlags{
+		Format: "json",
+		JQ:     "invalid[",
+	}
+	payload := map[string]string{"test": "value"}
+
+	var buf bytes.Buffer
+	err := r.WriteOutput(&buf, flags, payload)
+	if err == nil {
+		t.Error("expected JQ parse error, got nil")
 	}
 }
 

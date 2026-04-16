@@ -20,13 +20,7 @@ func NewClient(c *client.Client) *Client {
 
 // List retrieves projects based on the provided parameters.
 func (c *Client) List(ctx context.Context, params map[string]string) (*ProjectList, error) {
-	path := "/projects.json"
-	if len(params) > 0 {
-		var err error
-		if path, err = c.client.BuildPath(path, params); err != nil {
-			return nil, err
-		}
-	}
+	path := c.client.BuildPath("/projects.json", params)
 	var result ProjectList
 	if err := c.client.Get(ctx, path, &result); err != nil {
 		return nil, err
@@ -45,12 +39,7 @@ func (c *Client) GetByIdentifier(ctx context.Context, identifier string, params 
 }
 
 func (c *Client) get(ctx context.Context, path string, params map[string]string) (*Project, error) {
-	if len(params) > 0 {
-		var err error
-		if path, err = c.client.BuildPath(path, params); err != nil {
-			return nil, err
-		}
-	}
+	path = c.client.BuildPath(path, params)
 	var result struct {
 		Project Project `json:"project"`
 	}

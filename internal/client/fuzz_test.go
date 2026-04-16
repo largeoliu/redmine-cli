@@ -34,10 +34,7 @@ func FuzzBuildPath(f *testing.F) {
 		client := NewClient("https://example.com", "test-key")
 
 		params := parseParams(paramsStr)
-		result, err := client.BuildPath(path, params)
-		if err != nil {
-			return
-		}
+		result := client.BuildPath(path, params)
 
 		if len(result) > 10000 {
 			t.Errorf("BuildPath result too long: %d", len(result))

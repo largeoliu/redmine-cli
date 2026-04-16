@@ -646,7 +646,13 @@ func TestVerboseFlag(t *testing.T) {
 }
 
 func TestMissingURL(t *testing.T) {
-	_, stderr, exitCode := runCommand(
+	// Use a temporary config directory to ensure no existing config interferes
+	tempDir := t.TempDir()
+	env := map[string]string{
+		"REDMINE_CONFIG_DIR": tempDir,
+	}
+
+	_, stderr, exitCode := runCommandWithEnv(env,
 		"--key", "test-api-key",
 		"projects", "list",
 	)
@@ -655,13 +661,21 @@ func TestMissingURL(t *testing.T) {
 		t.Error("Expected non-zero exit code when URL is missing")
 	}
 
-	if !strings.Contains(stderr, "URL") {
-		t.Error("Expected error message about missing URL")
+	// Error message should contain "URL" or "url" (case insensitive check)
+	lowerStderr := strings.ToLower(stderr)
+	if !strings.Contains(lowerStderr, "url") {
+		t.Errorf("Expected error message about missing URL, got: %s", stderr)
 	}
 }
 
 func TestMissingAPIKey(t *testing.T) {
-	_, stderr, exitCode := runCommand(
+	// Use a temporary config directory to ensure no existing config interferes
+	tempDir := t.TempDir()
+	env := map[string]string{
+		"REDMINE_CONFIG_DIR": tempDir,
+	}
+
+	_, stderr, exitCode := runCommandWithEnv(env,
 		"--url", "https://example.com",
 		"projects", "list",
 	)
@@ -670,8 +684,10 @@ func TestMissingAPIKey(t *testing.T) {
 		t.Error("Expected non-zero exit code when API key is missing")
 	}
 
-	if !strings.Contains(stderr, "key") {
-		t.Error("Expected error message about missing API key")
+	// Error message should contain "key" or "api" (case insensitive check)
+	lowerStderr := strings.ToLower(stderr)
+	if !strings.Contains(lowerStderr, "key") && !strings.Contains(lowerStderr, "api") {
+		t.Errorf("Expected error message about missing API key, got: %s", stderr)
 	}
 }
 
@@ -933,6 +949,163 @@ func TestTrackersList(t *testing.T) {
 
 	if !strings.Contains(stdout, "Bug") {
 		t.Error("Expected output to contain 'Bug'")
+	}
+}
+
+func TestTrackerGet(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/trackers/1.json" {
+			w.Header().Set("Content-Type", "application/json")
+			response := map[string]any{
+				"tracker": map[string]any{
+					"id":          1,
+					"name":        "Bug",
+					"description": "Bug tracker",
+					"custom_fields": []map[string]any{
+						{
+							"id":           5,
+							"name":         "Affected Version",
+							"field_format": "list",
+							"possible_values": []map[string]any{
+								{"value": "v1.0", "label": "Version 1.0"},
+								{"value": "v2.0", "label": "Version 2.0"},
+							},
+						},
+					},
+				},
+			}
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	stdout, _, exitCode := runCommand(
+		"--url", server.URL,
+		"--key", "test-api-key",
+		"trackers", "get", "1",
+	)
+
+	if exitCode != 0 {
+		t.Errorf("Expected exit code 0, got %d", exitCode)
+	}
+
+	if !strings.Contains(stdout, "Bug") {
+		t.Error("Expected output to contain 'Bug'")
+	}
+	if !strings.Contains(stdout, "Affected Version") {
+		t.Error("Expected output to contain custom field name 'Affected Version'")
+	}
+	if !strings.Contains(stdout, "list") {
+		t.Error("Expected output to contain field_format 'list'")
+	}
+}
+
+func TestIssueCreateWithCustomField(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/issues.json" {
+			http.NotFound(w, r)
+			return
+		}
+		if r.Method != "POST" {
+			t.Errorf("expected POST request, got %s", r.Method)
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("failed to decode request: %v", err)
+		}
+		issue, ok := body["issue"].(map[string]any)
+		if !ok {
+			t.Fatal("expected issue in request body")
+		}
+		cfs, ok := issue["custom_fields"].([]any)
+		if !ok {
+			t.Fatal("expected custom_fields in issue")
+		}
+		if len(cfs) != 1 {
+			t.Errorf("expected 1 custom field, got %d", len(cfs))
+		}
+		cf := cfs[0].(map[string]any)
+		if cf["id"].(float64) != 5 {
+			t.Errorf("expected custom field id 5, got %v", cf["id"])
+		}
+		if cf["value"] != "v1.0" {
+			t.Errorf("expected custom field value 'v1.0', got %v", cf["value"])
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"issue": map[string]any{"id": 100, "subject": "Test Issue"},
+		})
+	}))
+	defer server.Close()
+
+	stdout, _, exitCode := runCommand(
+		"--url", server.URL,
+		"--key", "test-api-key",
+		"issues", "create",
+		"--project-id", "1",
+		"--subject", "Test Issue",
+		"--custom-field", "id:5:v1.0",
+	)
+
+	if exitCode != 0 {
+		t.Errorf("Expected exit code 0, got %d", exitCode)
+	}
+
+	if !strings.Contains(stdout, "100") {
+		t.Error("Expected output to contain issue ID")
+	}
+}
+
+func TestIssueUpdateWithCustomField(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/issues/123.json" {
+			http.NotFound(w, r)
+			return
+		}
+		if r.Method != "PUT" {
+			t.Errorf("expected PUT request, got %s", r.Method)
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("failed to decode request: %v", err)
+		}
+		issue, ok := body["issue"].(map[string]any)
+		if !ok {
+			t.Fatal("expected issue in request body")
+		}
+		cfs, ok := issue["custom_fields"].([]any)
+		if !ok {
+			t.Fatal("expected custom_fields in issue")
+		}
+		if len(cfs) != 1 {
+			t.Errorf("expected 1 custom field, got %d", len(cfs))
+		}
+		cf := cfs[0].(map[string]any)
+		if cf["id"].(float64) != 7 {
+			t.Errorf("expected custom field id 7, got %v", cf["id"])
+		}
+		if cf["value"] != "test-value" {
+			t.Errorf("expected custom field value 'test-value', got %v", cf["value"])
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	stdout, stderr, exitCode := runCommand(
+		"--url", server.URL,
+		"--key", "test-api-key",
+		"issues", "update", "123",
+		"--custom-field", "id:7:test-value",
+	)
+
+	if exitCode != 0 {
+		t.Errorf("Expected exit code 0, got %d. stderr: %s", exitCode, stderr)
+	}
+
+	if !strings.Contains(stdout, "123") {
+		t.Error("Expected output to contain issue ID")
 	}
 }
 

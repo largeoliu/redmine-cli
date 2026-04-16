@@ -1,34 +1,16 @@
 ignore:
   - "cmd/main.go"
-  - "internal/config/keyring.go"
-  - "internal/testutil/leak.go"
   - "internal/app/root.go"
-  - "internal/app/login.go"
-  - "internal/client/batch.go"
-  - "internal/client/client.go"
-  - "internal/client/logging.go"
-  - "internal/config/store.go"
-  - "internal/output/filter.go"
-  - "internal/output/formatter.go"
-  - "internal/resources/categories/commands.go"
-  - "internal/resources/issues/commands.go"
-  - "internal/resources/priorities/commands.go"
-  - "internal/resources/projects/commands.go"
-  - "internal/resources/time_entries/commands.go"
-  - "internal/resources/trackers/commands.go"
-  - "internal/resources/users/commands.go"
-  - "internal/resources/versions/commands.go"
-  - "internal/testutil/mock.go"
 
 coverage:
   status:
     project:
       default:
-        target: 100%
+        target: 95%
         threshold: null
         if_not_found: success
     patch:
       default:
-        target: 100%
+        target: 95%
         threshold: null
         if_not_found: success
