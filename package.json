@@ -7,7 +7,9 @@
     "redmine": "./bin/redmine"
   },
   "scripts": {
-    "postinstall": "node scripts/download.js"
+    "postinstall": "node scripts/download.js",
+    "prepare": "husky",
+    "lint:commit": "commitlint --from=HEAD~1 --to=HEAD"
   },
   "repository": {
     "type": "git",
@@ -27,11 +29,16 @@
   },
   "homepage": "https://github.com/largeoliu/redmine-cli#readme",
   "engines": {
-    "node": ">=14"
+    "node": ">=18"
   },
   "dependencies": {
     "tar": "^7.5.13",
     "unzipper": "^0.12.3"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "husky": "^9.1.7"
   },
   "files": [
     "bin",
