@@ -131,7 +131,7 @@ func promptCustomFieldsInteractive(tracker *trackers.Tracker, initialValues map[
 				}
 				fmt.Println()
 				fmt.Print("    Select: ")
-				input, _ = inputReader.ReadString('\n')
+				input, _ = inputReader.ReadString('\n') //nolint:errcheck,gosec
 				input = strings.TrimSpace(input)
 				if input != "" {
 					idx, err := strconv.Atoi(input)
@@ -144,7 +144,7 @@ func promptCustomFieldsInteractive(tracker *trackers.Tracker, initialValues map[
 			}
 		case "bool":
 			fmt.Print("    (y/n): ")
-			input, _ = inputReader.ReadString('\n')
+			input, _ = inputReader.ReadString('\n') //nolint:errcheck,gosec
 			input = strings.TrimSpace(input)
 			if input == "y" || input == "Y" {
 				values[cf.ID] = CustomField{ID: cf.ID, Value: "1"}
@@ -155,7 +155,7 @@ func promptCustomFieldsInteractive(tracker *trackers.Tracker, initialValues map[
 			}
 		case "date":
 			fmt.Printf("    Input (YYYY-MM-DD) [%s]: ", defaultVal)
-			input, _ = inputReader.ReadString('\n')
+			input, _ = inputReader.ReadString('\n') //nolint:errcheck,gosec
 			input = strings.TrimSpace(input)
 			if input == "" && defaultVal != "" {
 				values[cf.ID] = CustomField{ID: cf.ID, Value: defaultVal}
@@ -164,7 +164,7 @@ func promptCustomFieldsInteractive(tracker *trackers.Tracker, initialValues map[
 			}
 		default:
 			fmt.Printf("    Input [%s]: ", defaultVal)
-			input, _ = inputReader.ReadString('\n')
+			input, _ = inputReader.ReadString('\n') //nolint:errcheck,gosec
 			input = strings.TrimSpace(input)
 			if input != "" {
 				values[cf.ID] = CustomField{ID: cf.ID, Value: input}
