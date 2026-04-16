@@ -485,18 +485,18 @@ func TestPromptCustomFieldsInteractive_StringField_EmptyNoInitial(t *testing.T) 
 func TestPromptCustomFields_TerminalMock(t *testing.T) {
 	// 保存原始函数
 	originalIsTerminal := isTerminalFunc
-	originalStdinReader := stdinReader
+	originalNewStdinReader := newStdinReader
 	// 恢复原始函数
 	defer func() {
 		isTerminalFunc = originalIsTerminal
-		stdinReader = originalStdinReader
+		newStdinReader = originalNewStdinReader
 	}()
 
 	// 模拟终端环境
 	isTerminalFunc = func() bool { return true }
 
 	// 模拟 stdin 读取器
-	stdinReader = func() *bufio.Reader {
+	newStdinReader = func() *bufio.Reader {
 		return bufio.NewReader(strings.NewReader("test-value\n"))
 	}
 
@@ -517,5 +517,13 @@ func TestPromptCustomFields_TerminalMock(t *testing.T) {
 	}
 	if result[0].ID != 1 || result[0].Value != "test-value" {
 		t.Errorf("expected {ID: 1, Value: 'test-value'}, got {ID: %d, Value: '%s'}", result[0].ID, result[0].Value)
+	}
+}
+
+// TestNewBufioReader 测试 newBufioReader 函数
+func TestNewBufioReader(t *testing.T) {
+	reader := newBufioReader()
+	if reader == nil {
+		t.Error("expected non-nil reader")
 	}
 }

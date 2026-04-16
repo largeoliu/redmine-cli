@@ -77,8 +77,11 @@ var isTerminalFunc = func() bool {
 	return isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())
 }
 
-// stdinReader 是标准输入读取器，可被测试覆盖
-var stdinReader = func() *bufio.Reader {
+// newStdinReader 创建标准输入读取器，可被测试覆盖
+var newStdinReader = newBufioReader
+
+// newBufioReader 创建一个从 os.Stdin 读取的 bufio.Reader
+func newBufioReader() *bufio.Reader {
 	return bufio.NewReader(os.Stdin)
 }
 
@@ -92,7 +95,7 @@ func promptCustomFields(tracker *trackers.Tracker, initialValues map[int]CustomF
 		return nil, nil
 	}
 
-	reader := stdinReader()
+	reader := newStdinReader()
 	return promptCustomFieldsInteractive(tracker, initialValues, reader)
 }
 
