@@ -99,8 +99,16 @@ func TestStoreWithKeyring(t *testing.T) {
 		t.Fatalf("unmarshal config failed: %v", err)
 	}
 
-	if fileCfg.Instances[instanceName].APIKey != apiKey {
-		t.Errorf("API key should be saved in config file, got %s", fileCfg.Instances[instanceName].APIKey)
+	// If keyring is available, API key should be in keyring (empty in file)
+	// If keyring is not available, API key should be in config file
+	if store.keyring.IsAvailable() {
+		if fileCfg.Instances[instanceName].APIKey != "" {
+			t.Errorf("API key should be empty in config file when keyring is available, got %s", fileCfg.Instances[instanceName].APIKey)
+		}
+	} else {
+		if fileCfg.Instances[instanceName].APIKey != apiKey {
+			t.Errorf("API key should be saved in config file when keyring is not available, got %s", fileCfg.Instances[instanceName].APIKey)
+		}
 	}
 }
 
