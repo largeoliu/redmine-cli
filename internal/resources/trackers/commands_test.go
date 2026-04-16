@@ -4,6 +4,7 @@ package trackers
 import (
 	"context"
 	"io"
+	"net/http"
 	"testing"
 
 	"github.com/largeoliu/redmine-cli/internal/client"
@@ -11,7 +12,6 @@ import (
 	"github.com/largeoliu/redmine-cli/internal/types"
 )
 
-// mockResolver 实现 types.Resolver 接口
 type mockResolver struct {
 	resolveClientFunc func(flags *types.GlobalFlags) (*client.Client, error)
 	writeOutputFunc   func(w io.Writer, flags *types.GlobalFlags, payload any) error
@@ -49,8 +49,7 @@ func TestNewCommand(t *testing.T) {
 		t.Error("expected Short description, got empty")
 	}
 
-	// 检查子命令
-	expectedCommands := []string{"list"}
+	expectedCommands := []string{"list", "get"}
 	commands := cmd.Commands()
 	commandNames := make(map[string]bool)
 	for _, c := range commands {
@@ -106,6 +105,115 @@ func TestListCommand_ResolveClientError(t *testing.T) {
 
 	cmd := newListCommand(flags, resolver)
 	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from ResolveClient, got nil")
+	}
+}
+
+func TestListCommand_APIError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleError("/trackers.json", http.StatusInternalServerError, "Internal Server Error")
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+	}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from API, got nil")
+	}
+}
+
+func TestListCommand_WriteOutputError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := TrackerList{
+		Trackers: []Tracker{
+			{ID: 1, Name: "Bug"},
+		},
+	}
+	mock.HandleJSON("/trackers.json", response)
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return context.Canceled
+		},
+	}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from WriteOutput, got nil")
+	}
+}
+
+func TestGetCommand_Success(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := Tracker{
+		ID:   1,
+		Name: "Bug",
+		CustomFields: []TrackerCustomField{
+			{
+				ID:          1,
+				Name:        "Severity",
+				FieldFormat: "list",
+				PossibleValues: []ValueLabel{
+					{Value: "1", Label: "Low"},
+					{Value: "2", Label: "High"},
+				},
+			},
+		},
+	}
+	mock.HandleJSON("/trackers/1.json", response)
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return nil
+		},
+	}
+
+	cmd := newGetCommand(flags, resolver)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestGetCommand_ResolveClientError(t *testing.T) {
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return nil, context.Canceled
+		},
+	}
+
+	cmd := newGetCommand(flags, resolver)
+	cmd.SetArgs([]string{"1"})
 
 	err := cmd.Execute()
 	if err == nil {

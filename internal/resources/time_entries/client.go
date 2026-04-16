@@ -23,13 +23,7 @@ func NewClient(c *client.Client) *Client {
 
 // List retrieves time entries based on the provided parameters.
 func (c *Client) List(ctx context.Context, params map[string]string) (*TimeEntryList, error) {
-	path := "/time_entries.json"
-	if len(params) > 0 {
-		var err error
-		if path, err = c.client.BuildPath(path, params); err != nil {
-			return nil, err
-		}
-	}
+	path := c.client.BuildPath("/time_entries.json", params)
 	var result TimeEntryList
 	if err := c.client.Get(ctx, path, &result); err != nil {
 		return nil, err

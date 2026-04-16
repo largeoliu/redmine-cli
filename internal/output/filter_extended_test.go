@@ -486,6 +486,131 @@ func TestApplyJQWithReverse(t *testing.T) {
 	}
 }
 
+func TestSelectFieldsArrayOfMaps(t *testing.T) {
+	payload := map[string]any{
+		"issues": []any{
+			map[string]any{"id": float64(1), "name": "a", "extra": "x"},
+			map[string]any{"id": float64(2), "name": "b", "extra": "y"},
+		},
+	}
+	result, err := SelectFields(payload, []string{"id", "name"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(map[string]any)
+	if !ok {
+		t.Fatal("expected map result")
+	}
+	arr, ok := m["issues"].([]any)
+	if !ok {
+		t.Fatal("expected issues to be array")
+	}
+	if len(arr) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(arr))
+	}
+	first := arr[0].(map[string]any)
+	if len(first) != 2 {
+		t.Errorf("expected 2 fields in first item, got %d", len(first))
+	}
+	if _, exists := first["extra"]; exists {
+		t.Error("expected 'extra' to be filtered out")
+	}
+}
+
+func TestSelectFieldsArrayMapNoMatch(t *testing.T) {
+	payload := map[string]any{
+		"items": []any{
+			map[string]any{"extra": "x"},
+			map[string]any{"id": float64(1)},
+		},
+	}
+	result, err := SelectFields(payload, []string{"id"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(map[string]any)
+	if !ok {
+		t.Fatal("expected map result")
+	}
+	arr, ok := m["items"].([]any)
+	if !ok {
+		t.Fatal("expected items to be array")
+	}
+	if len(arr) != 1 {
+		t.Fatalf("expected 1 item (first excluded), got %d", len(arr))
+	}
+	item := arr[0].(map[string]any)
+	if _, exists := item["id"]; !exists {
+		t.Error("expected 'id' field in result")
+	}
+}
+
+func TestSelectFieldsArrayNonMapElements(t *testing.T) {
+	payload := map[string]any{
+		"tags": []any{"a", "b", "c"},
+	}
+	result, err := SelectFields(payload, []string{"id"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(map[string]any)
+	if !ok {
+		t.Fatal("expected map result")
+	}
+	arr, ok := m["tags"].([]any)
+	if !ok {
+		t.Fatal("expected tags to be array")
+	}
+	if len(arr) != 3 {
+		t.Fatalf("expected 3 items, got %d", len(arr))
+	}
+	if arr[0] != "a" || arr[1] != "b" || arr[2] != "c" {
+		t.Errorf("expected [a b c], got %v", arr)
+	}
+}
+
+func TestSelectFieldsMixedTopLevelAndArray(t *testing.T) {
+	payload := map[string]any{
+		"id": float64(1),
+		"items": []any{
+			map[string]any{"id": float64(10), "name": "a", "desc": "x"},
+			map[string]any{"id": float64(20), "name": "b", "desc": "y"},
+		},
+	}
+	result, err := SelectFields(payload, []string{"id", "name"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(map[string]any)
+	if !ok {
+		t.Fatal("expected map result")
+	}
+	if m["id"] != float64(1) {
+		t.Errorf("expected id=1, got %v", m["id"])
+	}
+	arr, ok := m["items"].([]any)
+	if !ok {
+		t.Fatal("expected items to be array")
+	}
+	for i, item := range arr {
+		itemMap := item.(map[string]any)
+		if len(itemMap) != 2 {
+			t.Errorf("item %d: expected 2 fields, got %d", i, len(itemMap))
+		}
+		if _, exists := itemMap["desc"]; exists {
+			t.Errorf("item %d: expected 'desc' to be filtered out", i)
+		}
+	}
+}
+
+func TestSelectFieldsMarshalError(t *testing.T) {
+	ch := make(chan int)
+	_, err := SelectFields(ch, []string{"id"})
+	if err == nil {
+		t.Error("expected error for unmarshallable payload")
+	}
+}
+
 // TestApplyJQWithAdd 测试 add 函数
 func TestApplyJQWithAdd(t *testing.T) {
 	var buf bytes.Buffer

@@ -3,6 +3,7 @@ package trackers
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/largeoliu/redmine-cli/internal/client"
 )
@@ -24,4 +25,15 @@ func (c *Client) List(ctx context.Context) (*TrackerList, error) {
 		return nil, err
 	}
 	return &result, nil
+}
+
+// Get retrieves a tracker by ID.
+func (c *Client) Get(ctx context.Context, id int) (*Tracker, error) {
+	var result struct {
+		Tracker *Tracker `json:"tracker"`
+	}
+	if err := c.client.Get(ctx, "/trackers/"+strconv.Itoa(id)+".json", &result); err != nil {
+		return nil, err
+	}
+	return result.Tracker, nil
 }

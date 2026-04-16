@@ -35,6 +35,19 @@ archives:
 checksum:
   name_template: 'checksums.txt'
 
+signs:
+  - cmd: cosign
+    env:
+      - COSIGN_EXPERIMENTAL=1
+    certificate: '${artifact}.pem'
+    args:
+      - sign-blob
+      - '--output-certificate=${certificate}'
+      - '--output-signature=${signature}'
+      - '${artifact}'
+    artifacts: checksum
+    output: true
+
 changelog:
   sort: asc
   filters:
@@ -51,4 +64,17 @@ release:
     name: redmine-cli
   draft: false
   prerelease: auto
-  replace_existing_artifacts: true
+  replace_existing_artifacts: false
+
+brews:
+  - name: redmine
+    repository:
+      owner: largeoliu
+      name: homebrew-tap
+    directory: Formula
+    homepage: https://github.com/largeoliu/redmine-cli
+    description: A CLI tool for Redmine
+    install: |
+      bin.install "redmine"
+    test: |
+      system "#{bin}/redmine", "version"

@@ -2,16 +2,202 @@
 package issues
 
 import (
+	"bufio"
 	"fmt"
+	"os"
+	"strconv"
+	"strings"
 
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 
 	"github.com/largeoliu/redmine-cli/internal/errors"
 	"github.com/largeoliu/redmine-cli/internal/resources/helpers"
+	"github.com/largeoliu/redmine-cli/internal/resources/trackers"
 	"github.com/largeoliu/redmine-cli/internal/types"
 )
 
-// NewCommand creates a new issues command.
+type customFieldFlags struct {
+	Fields []string
+}
+
+func parseCustomFieldFlags(fields []string, tracker *trackers.Tracker) ([]CustomField, error) {
+	if len(fields) == 0 {
+		return nil, nil
+	}
+
+	cfMap := make(map[int]CustomField)
+
+	for _, f := range fields {
+		parts := strings.SplitN(f, ":", 3)
+		if len(parts) < 2 {
+			return nil, fmt.Errorf("invalid custom field format: %s (expected name:value or id:X:value)", f)
+		}
+
+		cf := CustomField{}
+		if parts[0] == "id" {
+			if len(parts) < 3 {
+				return nil, fmt.Errorf("invalid custom field format: %s (expected id:X:value)", f)
+			}
+			var id int
+			if _, err := fmt.Sscanf(parts[1], "%d", &id); err != nil {
+				return nil, fmt.Errorf("invalid custom field id: %s", parts[1])
+			}
+			cf.ID = id
+			cf.Value = parts[2]
+		} else {
+			if tracker == nil {
+				return nil, fmt.Errorf("tracker required to match custom field by name, use id:X:value format instead")
+			}
+			found := false
+			for _, tf := range tracker.CustomFields {
+				if tf.Name == parts[0] {
+					cf.ID = tf.ID
+					cf.Value = parts[1]
+					found = true
+					break
+				}
+			}
+			if !found {
+				return nil, fmt.Errorf("custom field not found: %s", parts[0])
+			}
+		}
+		cfMap[cf.ID] = cf
+	}
+
+	result := make([]CustomField, 0, len(cfMap))
+	for _, cf := range cfMap {
+		result = append(result, cf)
+	}
+	return result, nil
+}
+
+// isTerminalFunc 检查是否为终端环境，可被测试覆盖
+var isTerminalFunc = func() bool {
+	return isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())
+}
+
+// newStdinReader 创建标准输入读取器，可被测试覆盖
+var newStdinReader = newBufioReader
+
+// newBufioReader 创建一个从 os.Stdin 读取的 bufio.Reader
+func newBufioReader() *bufio.Reader {
+	return bufio.NewReader(os.Stdin)
+}
+
+//nolint:gocyclo
+func promptCustomFields(tracker *trackers.Tracker, initialValues map[int]CustomField) ([]CustomField, error) {
+	if len(tracker.CustomFields) == 0 {
+		return nil, nil
+	}
+
+	if !isTerminalFunc() {
+		return nil, nil
+	}
+
+	reader := newStdinReader()
+	return promptCustomFieldsInteractive(tracker, initialValues, reader)
+}
+
+// promptCustomFieldsInteractive 是可测试的交互式自定义字段提示函数
+//
+//nolint:gocyclo
+func promptCustomFieldsInteractive(tracker *trackers.Tracker, initialValues map[int]CustomField, inputReader *bufio.Reader) ([]CustomField, error) {
+	values := make(map[int]CustomField)
+	for k, v := range initialValues {
+		values[k] = v
+	}
+
+	fmt.Println("\n📋 Custom fields detected, please fill in:")
+
+	for _, cf := range tracker.CustomFields {
+		current, hasCurrent := values[cf.ID]
+		defaultVal := ""
+		if hasCurrent {
+			defaultVal = fmt.Sprintf("%v", current.Value)
+		}
+
+		fmt.Printf("[%d] %s\n", cf.ID, cf.Name)
+		fmt.Printf("    Type: %s\n", cf.FieldFormat)
+
+		var input string
+
+		switch cf.FieldFormat {
+		case "list":
+			if len(cf.PossibleValues) > 0 {
+				fmt.Print("    Options: ")
+				for i, pv := range cf.PossibleValues {
+					fmt.Printf("[%d. %s] ", i+1, pv.Label)
+				}
+				fmt.Println()
+				fmt.Print("    Select: ")
+				input, _ = inputReader.ReadString('\n') //nolint:errcheck,gosec
+				input = strings.TrimSpace(input)
+				if input != "" {
+					idx, err := strconv.Atoi(input)
+					if err == nil && idx >= 1 && idx <= len(cf.PossibleValues) {
+						values[cf.ID] = CustomField{ID: cf.ID, Value: cf.PossibleValues[idx-1].Value}
+					}
+				} else if hasCurrent {
+					values[cf.ID] = current
+				}
+			}
+		case "bool":
+			fmt.Print("    (y/n): ")
+			input, _ = inputReader.ReadString('\n') //nolint:errcheck,gosec
+			input = strings.TrimSpace(input)
+			if input == "y" || input == "Y" {
+				values[cf.ID] = CustomField{ID: cf.ID, Value: "1"}
+			} else if input == "n" || input == "N" {
+				values[cf.ID] = CustomField{ID: cf.ID, Value: "0"}
+			} else if hasCurrent {
+				values[cf.ID] = current
+			}
+		case "date":
+			fmt.Printf("    Input (YYYY-MM-DD) [%s]: ", defaultVal)
+			input, _ = inputReader.ReadString('\n') //nolint:errcheck,gosec
+			input = strings.TrimSpace(input)
+			if input == "" && defaultVal != "" {
+				values[cf.ID] = CustomField{ID: cf.ID, Value: defaultVal}
+			} else if input != "" {
+				values[cf.ID] = CustomField{ID: cf.ID, Value: input}
+			}
+		default:
+			fmt.Printf("    Input [%s]: ", defaultVal)
+			input, _ = inputReader.ReadString('\n') //nolint:errcheck,gosec
+			input = strings.TrimSpace(input)
+			if input != "" {
+				values[cf.ID] = CustomField{ID: cf.ID, Value: input}
+			} else if hasCurrent {
+				values[cf.ID] = current
+			}
+		}
+		fmt.Println()
+	}
+
+	result := make([]CustomField, 0, len(values))
+	for _, v := range values {
+		result = append(result, v)
+	}
+	return result, nil
+}
+
+func mergeCustomFields(interactive, flags []CustomField) []CustomField {
+	cfMap := make(map[int]CustomField)
+	for _, cf := range interactive {
+		cfMap[cf.ID] = cf
+	}
+	for _, cf := range flags {
+		cfMap[cf.ID] = cf
+	}
+	result := make([]CustomField, 0, len(cfMap))
+	for _, cf := range cfMap {
+		result = append(result, cf)
+	}
+	return result
+}
+
+// NewCommand creates a new issue command with all subcommands.
 func NewCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "issue",
@@ -95,6 +281,7 @@ func newGetCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Com
 
 func newCreateCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Command {
 	req := &IssueCreateRequest{}
+	createFlags := &customFieldFlags{}
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a new issue",
@@ -105,13 +292,32 @@ func newCreateCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.
 			if req.Subject == "" {
 				return errors.NewValidation("subject is required")
 			}
-			if flags.DryRun {
-				helpers.DryRunCreate("issue", req)
-				return nil
-			}
 			c, err := resolver.ResolveClient(flags)
 			if err != nil {
 				return err
+			}
+			var trackerDef *trackers.Tracker
+			if req.TrackerID > 0 {
+				trackerDef, _ = trackers.NewClient(c).Get(cmd.Context(), req.TrackerID) //nolint:errcheck
+			}
+			var flagCFs []CustomField
+			if len(createFlags.Fields) > 0 {
+				flagCFs, err = parseCustomFieldFlags(createFlags.Fields, trackerDef)
+				if err != nil {
+					return err
+				}
+			}
+			var interactiveCFs []CustomField
+			if trackerDef != nil {
+				interactiveCFs, _ = promptCustomFields(trackerDef, nil) //nolint:errcheck
+			}
+			mergedCFs := mergeCustomFields(interactiveCFs, flagCFs)
+			if len(mergedCFs) > 0 {
+				req.CustomFields = mergedCFs
+			}
+			if flags.DryRun {
+				helpers.DryRunCreate("issue", req)
+				return nil
 			}
 			result, err := NewClient(c).Create(cmd.Context(), req)
 			if err != nil {
@@ -133,11 +339,13 @@ func newCreateCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.
 	cmd.Flags().StringVar(&req.StartDate, "start-date", "", "Start date (YYYY-MM-DD)")
 	cmd.Flags().StringVar(&req.DueDate, "due-date", "", "Due date (YYYY-MM-DD)")
 	cmd.Flags().IntVar(&req.DoneRatio, "done-ratio", 0, "Done ratio (0-100)")
+	cmd.Flags().StringSliceVar(&createFlags.Fields, "custom-field", nil, "Custom field value (format: name:value or id:X:value, can be specified multiple times)")
 	return cmd
 }
 
 func newUpdateCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Command {
 	req := &IssueUpdateRequest{}
+	updateFlags := &customFieldFlags{}
 	cmd := &cobra.Command{
 		Use:   "update <id>",
 		Short: "Update an issue",
@@ -147,13 +355,23 @@ func newUpdateCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.
 			if err != nil {
 				return err
 			}
-			if flags.DryRun {
-				helpers.DryRunUpdate("issue", id, req)
-				return nil
-			}
 			c, err := resolver.ResolveClient(flags)
 			if err != nil {
 				return err
+			}
+			var flagCFs []CustomField
+			if len(updateFlags.Fields) > 0 {
+				flagCFs, err = parseCustomFieldFlags(updateFlags.Fields, nil)
+				if err != nil {
+					return err
+				}
+			}
+			if len(flagCFs) > 0 {
+				req.CustomFields = flagCFs
+			}
+			if flags.DryRun {
+				helpers.DryRunUpdate("issue", id, req)
+				return nil
 			}
 			if err := NewClient(c).Update(cmd.Context(), id, req); err != nil {
 				return err
@@ -173,6 +391,7 @@ func newUpdateCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.
 	cmd.Flags().StringVar(&req.DueDate, "due-date", "", "Due date (YYYY-MM-DD)")
 	cmd.Flags().IntVar(&req.DoneRatio, "done-ratio", 0, "Done ratio (0-100)")
 	cmd.Flags().StringVar(&req.Notes, "notes", "", "Notes to add")
+	cmd.Flags().StringSliceVar(&updateFlags.Fields, "custom-field", nil, "Custom field value (format: name:value or id:X:value, can be specified multiple times)")
 	return cmd
 }
 

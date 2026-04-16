@@ -207,6 +207,7 @@ func (c *Client) retryDelay(attempt int) time.Duration {
 	if attempt > maxShift {
 		attempt = maxShift
 	}
+	//nolint:gosec // G115: attempt is bounded to [0, 30], safe to convert #nosec G115
 	shift := uint(attempt)
 	delay := c.retry.InitialDelay * time.Duration(1<<shift)
 	if delay > c.retry.MaxDelay {
@@ -216,15 +217,15 @@ func (c *Client) retryDelay(attempt int) time.Duration {
 }
 
 // BuildPath builds a URL path with query parameters.
-func (c *Client) BuildPath(path string, params map[string]string) (string, error) {
+func (c *Client) BuildPath(path string, params map[string]string) string {
 	if len(params) == 0 {
-		return path, nil
+		return path
 	}
 	values := url.Values{}
 	for k, v := range params {
 		values.Set(k, v)
 	}
-	return path + "?" + values.Encode(), nil
+	return path + "?" + values.Encode()
 }
 
 // Ping tests the connectivity to the given URL using HTTP HEAD request.

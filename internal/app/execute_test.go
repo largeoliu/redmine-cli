@@ -7,6 +7,7 @@ import (
 )
 
 func TestExecute(t *testing.T) {
+	// Save original args and restore after test
 	oldArgs := os.Args
 	defer func() { os.Args = oldArgs }()
 
@@ -34,6 +35,7 @@ func TestExecute(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Create temp config dir to avoid config issues
 			tmpDir := t.TempDir()
 			os.Setenv("REDMINE_CONFIG_DIR", tmpDir)
 			defer os.Unsetenv("REDMINE_CONFIG_DIR")
@@ -70,6 +72,10 @@ func TestExecuteContext(t *testing.T) {
 }
 
 func TestExecuteWithSignal(t *testing.T) {
+	// This test verifies that Execute sets up signal handling
+	// We can't actually test signal handling in a unit test,
+	// but we can verify the function doesn't panic
+
 	tmpDir := t.TempDir()
 	os.Setenv("REDMINE_CONFIG_DIR", tmpDir)
 	defer os.Unsetenv("REDMINE_CONFIG_DIR")

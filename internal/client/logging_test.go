@@ -253,3 +253,91 @@ func TestLoggingTransport_RoundTripWithResponseHeaderMultiple(t *testing.T) {
 		t.Error("Verbose mode should log multiple header values")
 	}
 }
+
+func TestLoggingTransport_RoundTripVerboseWithNonAPIKeyHeaders(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	var logBuf bytes.Buffer
+	transport := NewLoggingTransport(http.DefaultTransport, &logBuf, true)
+
+	req, err := http.NewRequest("GET", server.URL, nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("X-Custom-Header", "custom-value")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := transport.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("RoundTrip() error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	logOutput := logBuf.String()
+	if !strings.Contains(logOutput, "X-Custom-Header") {
+		t.Error("Verbose mode should log non-API-key request headers")
+	}
+	if !strings.Contains(logOutput, "custom-value") {
+		t.Error("Verbose mode should log non-API-key header values")
+	}
+	if strings.Contains(logOutput, "***") {
+		t.Error("Non-API-key headers should not be masked")
+	}
+}
+
+func TestLoggingTransport_RoundTripErrorNonVerbose(t *testing.T) {
+	var logBuf bytes.Buffer
+
+	errorTransport := &mockErrorTransport{}
+	transport := NewLoggingTransport(errorTransport, &logBuf, false)
+
+	req, err := http.NewRequest("GET", "http://example.com/test", nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+
+	_, err = transport.RoundTrip(req)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	logOutput := logBuf.String()
+	if !strings.Contains(logOutput, "ERROR") {
+		t.Error("Non-verbose RoundTrip() should log ERROR on failure")
+	}
+	if strings.Contains(logOutput, "http://") {
+		t.Error("Non-verbose error log should not contain full URL")
+	}
+}
+
+func TestLoggingTransport_NonVerboseResponseOnly(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer server.Close()
+
+	var logBuf bytes.Buffer
+	transport := NewLoggingTransport(http.DefaultTransport, &logBuf, false)
+
+	req, err := http.NewRequest("GET", server.URL, nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+
+	resp, err := transport.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("RoundTrip() error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	logOutput := logBuf.String()
+	if !strings.Contains(logOutput, "<-- 201") {
+		t.Errorf("Non-verbose mode should log status code, got: %s", logOutput)
+	}
+	if strings.Contains(logOutput, "Created") {
+		t.Error("Non-verbose mode should not log status text")
+	}
+}

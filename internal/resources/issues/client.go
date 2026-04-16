@@ -21,13 +21,7 @@ func NewClient(c *client.Client) *Client {
 
 // List retrieves issues based on the provided parameters.
 func (c *Client) List(ctx context.Context, params map[string]string) (*IssueList, error) {
-	path := "/issues.json"
-	if len(params) > 0 {
-		var err error
-		if path, err = c.client.BuildPath(path, params); err != nil {
-			return nil, err
-		}
-	}
+	path := c.client.BuildPath("/issues.json", params)
 	var result IssueList
 	if err := c.client.Get(ctx, path, &result); err != nil {
 		return nil, err
@@ -37,13 +31,7 @@ func (c *Client) List(ctx context.Context, params map[string]string) (*IssueList
 
 // Get retrieves an issue by ID.
 func (c *Client) Get(ctx context.Context, id int, params map[string]string) (*Issue, error) {
-	path := fmt.Sprintf("/issues/%d.json", id)
-	if len(params) > 0 {
-		var err error
-		if path, err = c.client.BuildPath(path, params); err != nil {
-			return nil, err
-		}
-	}
+	path := c.client.BuildPath(fmt.Sprintf("/issues/%d.json", id), params)
 	var result struct {
 		Issue Issue `json:"issue"`
 	}

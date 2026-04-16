@@ -51,6 +51,35 @@ get_latest_version() {
     echo "$version"
 }
 
+verify_checksum() {
+    version="$1"
+    archive_name="$2"
+    archive_path="$3"
+    
+    checksums_url="https://github.com/${REPO}/releases/download/${version}/checksums.txt"
+    checksums_path="$(dirname "$archive_path")/checksums.txt"
+    
+    info "Downloading checksums..."
+    if ! curl -fsSL "$checksums_url" -o "$checksums_path"; then
+        warn "Could not download checksums, skipping verification"
+        return 0
+    fi
+    
+    expected_sha=$(grep "  ${archive_name}$" "$checksums_path" | awk '{print $1}')
+    if [ -z "$expected_sha" ]; then
+        warn "Archive not found in checksums file, skipping verification"
+        return 0
+    fi
+    
+    info "Verifying checksum..."
+    actual_sha=$(sha256sum "$archive_path" | awk '{print $1}')
+    if [ "$actual_sha" != "$expected_sha" ]; then
+        error "Checksum mismatch!\n  Expected: ${expected_sha}\n  Actual:   ${actual_sha}"
+    fi
+    
+    info "Checksum verified"
+}
+
 download_binary() {
     version="$1"
     os="$2"
@@ -72,6 +101,8 @@ download_binary() {
     if ! curl -fsSL "$download_url" -o "$archive_path"; then
         error "Failed to download ${archive_name}"
     fi
+    
+    verify_checksum "$version" "$archive_name" "$archive_path"
     
     info "Extracting..."
     

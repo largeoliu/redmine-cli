@@ -235,8 +235,7 @@ func TestSplitByComma(t *testing.T) {
 	}
 }
 
-func TestResolverInterface(t *testing.T) {
-	// 测试 resolver 实现 types.Resolver 接口
+func TestResolverInterface(_ *testing.T) {
 	var _ types.Resolver = &resolver{}
 }
 
@@ -914,10 +913,6 @@ func TestWriteOutputSelectFieldsMarshalError(t *testing.T) {
 }
 
 func TestResolverResolveClientError(t *testing.T) {
-	tmpDir := t.TempDir()
-	os.Setenv("REDMINE_CONFIG_DIR", tmpDir)
-	defer os.Unsetenv("REDMINE_CONFIG_DIR")
-
 	r := &resolver{}
 	flags := &types.GlobalFlags{}
 	_, err := r.ResolveClient(flags)
