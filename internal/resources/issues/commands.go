@@ -3,6 +3,7 @@ package issues
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -15,6 +16,22 @@ import (
 	"github.com/largeoliu/redmine-cli/internal/resources/trackers"
 	"github.com/largeoliu/redmine-cli/internal/types"
 )
+
+// terminalReader 抽象终端输入读取，用于测试
+type terminalReader interface {
+	ReadLine() (string, error)
+}
+
+// defaultTerminalReader 默认的终端读取器
+type defaultTerminalReader struct {
+	reader io.Reader
+}
+
+func (r *defaultTerminalReader) ReadLine() (string, error) {
+	var input string
+	_, err := fmt.Fscanln(r.reader, &input)
+	return input, err
+}
 
 type customFieldFlags struct {
 	Fields []string
@@ -71,13 +88,13 @@ func parseCustomFieldFlags(fields []string, tracker *trackers.Tracker) ([]Custom
 	return result, nil
 }
 
-//nolint:gocyclo
-func promptCustomFields(tracker *trackers.Tracker, initialValues map[int]CustomField) ([]CustomField, error) {
+// promptCustomFieldsWithReader 使用自定义 reader 的 promptCustomFields 实现，便于测试
+func promptCustomFieldsWithReader(tracker *trackers.Tracker, initialValues map[int]CustomField, reader terminalReader, isTerminal bool) ([]CustomField, error) {
 	if len(tracker.CustomFields) == 0 {
 		return nil, nil
 	}
 
-	if !isatty.IsTerminal(os.Stdout.Fd()) && !isatty.IsCygwinTerminal(os.Stdout.Fd()) {
+	if !isTerminal {
 		return nil, nil
 	}
 
@@ -99,6 +116,7 @@ func promptCustomFields(tracker *trackers.Tracker, initialValues map[int]CustomF
 		fmt.Printf("    Type: %s\n", cf.FieldFormat)
 
 		var input string
+		var readErr error
 
 		switch cf.FieldFormat {
 		case "list":
@@ -109,8 +127,8 @@ func promptCustomFields(tracker *trackers.Tracker, initialValues map[int]CustomF
 				}
 				fmt.Println()
 				fmt.Print("    Select: ")
-				fmt.Scanln(&input) //nolint:errcheck,gosec
-				if input != "" {
+				input, readErr = reader.ReadLine()
+				if readErr == nil && input != "" {
 					idx, err := strconv.Atoi(input)
 					if err == nil && idx >= 1 && idx <= len(cf.PossibleValues) {
 						values[cf.ID] = CustomField{ID: cf.ID, Value: cf.PossibleValues[idx-1].Value}
@@ -121,31 +139,32 @@ func promptCustomFields(tracker *trackers.Tracker, initialValues map[int]CustomF
 			}
 		case "bool":
 			fmt.Print("    (y/n): ")
-			fmt.Scanln(&input) //nolint:errcheck,gosec
-			if input == "y" || input == "Y" {
+			input, readErr = reader.ReadLine()
+			if readErr == nil && (input == "y" || input == "Y") {
 				values[cf.ID] = CustomField{ID: cf.ID, Value: "1"}
-			} else if input == "n" || input == "N" {
+			} else if readErr == nil && (input == "n" || input == "N") {
 				values[cf.ID] = CustomField{ID: cf.ID, Value: "0"}
 			} else if hasCurrent {
 				values[cf.ID] = current
 			}
 		case "date":
 			fmt.Printf("    Input (YYYY-MM-DD) [%s]: ", defaultVal)
-			fmt.Scanln(&input) //nolint:errcheck,gosec
-			if input == "" && defaultVal != "" {
+			input, readErr = reader.ReadLine()
+			if readErr == nil && input == "" && defaultVal != "" {
 				values[cf.ID] = CustomField{ID: cf.ID, Value: defaultVal}
-			} else if input != "" {
+			} else if readErr == nil && input != "" {
 				values[cf.ID] = CustomField{ID: cf.ID, Value: input}
 			}
 		default:
 			fmt.Printf("    Input [%s]: ", defaultVal)
-			fmt.Scanln(&input) //nolint:errcheck,gosec
-			if input != "" {
+			input, readErr = reader.ReadLine()
+			if readErr == nil && input != "" {
 				values[cf.ID] = CustomField{ID: cf.ID, Value: input}
 			} else if hasCurrent {
 				values[cf.ID] = current
 			}
 		}
+		_ = readErr // 忽略读取错误，使用默认值或当前值
 		fmt.Println()
 	}
 
@@ -154,6 +173,13 @@ func promptCustomFields(tracker *trackers.Tracker, initialValues map[int]CustomF
 		result = append(result, v)
 	}
 	return result, nil
+}
+
+//nolint:gocyclo
+func promptCustomFields(tracker *trackers.Tracker, initialValues map[int]CustomField) ([]CustomField, error) {
+	isTerminal := isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())
+	reader := &defaultTerminalReader{reader: os.Stdin}
+	return promptCustomFieldsWithReader(tracker, initialValues, reader, isTerminal)
 }
 
 func mergeCustomFields(interactive, flags []CustomField) []CustomField {
