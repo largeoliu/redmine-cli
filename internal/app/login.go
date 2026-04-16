@@ -10,6 +10,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/largeoliu/redmine-cli/internal/client"
 	"github.com/largeoliu/redmine-cli/internal/config"
@@ -121,11 +122,23 @@ func promptSecret(reader *bufio.Reader, prompt string) string {
 	if prompt != "" {
 		fmt.Print(prompt + ": ")
 	}
-	input, err := reader.ReadString('\n')
+
+	fd := int(os.Stdin.Fd()) //nolint:gosec
+	oldState, err := term.MakeRaw(fd)
+	if err != nil {
+		input, _ := reader.ReadString('\n') //nolint:errcheck
+		return strings.TrimSpace(input)
+	}
+	defer func() {
+		_ = term.Restore(fd, oldState) //nolint:errcheck
+	}()
+
+	input, err := term.ReadPassword(fd)
+	fmt.Println()
 	if err != nil {
 		return ""
 	}
-	return strings.TrimSpace(input)
+	return strings.TrimSpace(string(input))
 }
 
 func promptBool(reader *bufio.Reader, prompt string, defaultValue bool) bool {

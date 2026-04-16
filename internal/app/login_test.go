@@ -972,6 +972,42 @@ func TestPromptSecretWithWhitespace(t *testing.T) {
 	}
 }
 
+// 测试 promptSecret 边界情况
+func TestPromptSecretBoundaryCases(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"empty input returns empty", "\n", ""},
+		{"tab-only input trimmed", "\t\n", ""},
+		{"mixed whitespace trimmed", "  \t  \n", ""},
+		{"api key with special chars", "abc123!@#$%\n", "abc123!@#$%"},
+		{"long input preserved", strings.Repeat("a", 1000) + "\n", strings.Repeat("a", 1000)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reader := bufio.NewReader(strings.NewReader(tt.input))
+			result := promptSecret(reader, "prompt")
+			if result != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, result)
+			}
+		})
+	}
+}
+
+// 测试 promptSecret 非终端环境下 fallback
+func TestPromptSecretFallbackMode(t *testing.T) {
+	input := "fallback-secret\n"
+	reader := bufio.NewReader(strings.NewReader(input))
+	result := promptSecret(reader, "API Key")
+
+	if result != "fallback-secret" {
+		t.Errorf("expected 'fallback-secret' in fallback mode, got %q", result)
+	}
+}
+
 // 测试 login 命令的标志解析
 func TestLoginCommandFlagParsing(t *testing.T) {
 	tests := []struct {
