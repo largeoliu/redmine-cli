@@ -209,9 +209,6 @@ func (c *Client) retryDelay(attempt int) time.Duration {
 	}
 	//nolint:gosec // G115: attempt is bounded to [0, 30], safe to convert #nosec G115
 	shift := uint(attempt)
-	if shift > 63 {
-		shift = 63
-	}
 	delay := c.retry.InitialDelay * time.Duration(1<<shift)
 	if delay > c.retry.MaxDelay {
 		delay = c.retry.MaxDelay

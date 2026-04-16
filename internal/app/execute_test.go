@@ -42,9 +42,10 @@ func TestExecute(t *testing.T) {
 
 			os.Args = tt.args
 
-			// Execute should not panic
-			// Note: We can't easily capture the exit code without modifying Execute
-			// This test mainly ensures Execute doesn't panic
+			exitCode := Execute()
+			if exitCode != tt.wantExit {
+				t.Errorf("Execute() = %d, want %d", exitCode, tt.wantExit)
+			}
 		})
 	}
 }
@@ -78,7 +79,20 @@ func TestExecuteWithSignal(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.Setenv("REDMINE_CONFIG_DIR", tmpDir)
 	defer os.Unsetenv("REDMINE_CONFIG_DIR")
+}
 
-	// Just verify Execute can be called without panic
-	// The actual signal handling is tested through integration
+func TestExecuteWithError(t *testing.T) {
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	tmpDir := t.TempDir()
+	os.Setenv("REDMINE_CONFIG_DIR", tmpDir)
+	defer os.Unsetenv("REDMINE_CONFIG_DIR")
+
+	os.Args = []string{"redmine", "nonexistent-command"}
+
+	exitCode := Execute()
+	if exitCode == 0 {
+		t.Error("Execute() with invalid command should return non-zero exit code")
+	}
 }
