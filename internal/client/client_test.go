@@ -250,10 +250,7 @@ func TestBuildPath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := NewClient("https://example.com", "test-key")
-			result, err := c.BuildPath(tt.path, tt.params)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			result := c.BuildPath(tt.path, tt.params)
 			switch tt.name {
 			case "with params":
 				if result[:11] != tt.expected[:11] {
@@ -271,10 +268,7 @@ func TestBuildPath(t *testing.T) {
 func TestBuildPathWithParams(t *testing.T) {
 	c := NewClient("https://example.com", "test-key")
 	params := map[string]string{"key": "value"}
-	result, err := c.BuildPath("/test.json", params)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	result := c.BuildPath("/test.json", params)
 	if result != "/test.json?key=value" {
 		t.Errorf("expected /test.json?key=value, got %s", result)
 	}

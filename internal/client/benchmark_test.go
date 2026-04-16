@@ -162,7 +162,7 @@ func BenchmarkClientBuildPath(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = client.BuildPath("/issues.json", params)
+		_ = client.BuildPath("/issues.json", params)
 	}
 }
 
@@ -172,7 +172,7 @@ func BenchmarkClientBuildPathNoParams(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = client.BuildPath("/issues.json", nil)
+		_ = client.BuildPath("/issues.json", nil)
 	}
 }
 
