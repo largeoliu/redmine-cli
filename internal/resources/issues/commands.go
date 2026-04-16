@@ -2,6 +2,7 @@
 package issues
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"strconv"
@@ -71,16 +72,34 @@ func parseCustomFieldFlags(fields []string, tracker *trackers.Tracker) ([]Custom
 	return result, nil
 }
 
+// isTerminalFunc 检查是否为终端环境，可被测试覆盖
+var isTerminalFunc = func() bool {
+	return isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())
+}
+
+// stdinReader 是标准输入读取器，可被测试覆盖
+var stdinReader = func() *bufio.Reader {
+	return bufio.NewReader(os.Stdin)
+}
+
 //nolint:gocyclo
 func promptCustomFields(tracker *trackers.Tracker, initialValues map[int]CustomField) ([]CustomField, error) {
 	if len(tracker.CustomFields) == 0 {
 		return nil, nil
 	}
 
-	if !isatty.IsTerminal(os.Stdout.Fd()) && !isatty.IsCygwinTerminal(os.Stdout.Fd()) {
+	if !isTerminalFunc() {
 		return nil, nil
 	}
 
+	reader := stdinReader()
+	return promptCustomFieldsInteractive(tracker, initialValues, reader)
+}
+
+// promptCustomFieldsInteractive 是可测试的交互式自定义字段提示函数
+//
+//nolint:gocyclo
+func promptCustomFieldsInteractive(tracker *trackers.Tracker, initialValues map[int]CustomField, inputReader *bufio.Reader) ([]CustomField, error) {
 	values := make(map[int]CustomField)
 	for k, v := range initialValues {
 		values[k] = v
@@ -109,7 +128,8 @@ func promptCustomFields(tracker *trackers.Tracker, initialValues map[int]CustomF
 				}
 				fmt.Println()
 				fmt.Print("    Select: ")
-				fmt.Scanln(&input) //nolint:errcheck,gosec
+				input, _ = inputReader.ReadString('\n')
+				input = strings.TrimSpace(input)
 				if input != "" {
 					idx, err := strconv.Atoi(input)
 					if err == nil && idx >= 1 && idx <= len(cf.PossibleValues) {
@@ -121,7 +141,8 @@ func promptCustomFields(tracker *trackers.Tracker, initialValues map[int]CustomF
 			}
 		case "bool":
 			fmt.Print("    (y/n): ")
-			fmt.Scanln(&input) //nolint:errcheck,gosec
+			input, _ = inputReader.ReadString('\n')
+			input = strings.TrimSpace(input)
 			if input == "y" || input == "Y" {
 				values[cf.ID] = CustomField{ID: cf.ID, Value: "1"}
 			} else if input == "n" || input == "N" {
@@ -131,7 +152,8 @@ func promptCustomFields(tracker *trackers.Tracker, initialValues map[int]CustomF
 			}
 		case "date":
 			fmt.Printf("    Input (YYYY-MM-DD) [%s]: ", defaultVal)
-			fmt.Scanln(&input) //nolint:errcheck,gosec
+			input, _ = inputReader.ReadString('\n')
+			input = strings.TrimSpace(input)
 			if input == "" && defaultVal != "" {
 				values[cf.ID] = CustomField{ID: cf.ID, Value: defaultVal}
 			} else if input != "" {
@@ -139,7 +161,8 @@ func promptCustomFields(tracker *trackers.Tracker, initialValues map[int]CustomF
 			}
 		default:
 			fmt.Printf("    Input [%s]: ", defaultVal)
-			fmt.Scanln(&input) //nolint:errcheck,gosec
+			input, _ = inputReader.ReadString('\n')
+			input = strings.TrimSpace(input)
 			if input != "" {
 				values[cf.ID] = CustomField{ID: cf.ID, Value: input}
 			} else if hasCurrent {

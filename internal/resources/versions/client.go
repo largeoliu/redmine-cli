@@ -20,13 +20,7 @@ func NewClient(c *client.Client) *Client {
 
 // List retrieves versions for a project.
 func (c *Client) List(ctx context.Context, projectID int, params map[string]string) (*VersionList, error) {
-	path := fmt.Sprintf("/projects/%d/versions.json", projectID)
-	if len(params) > 0 {
-		var err error
-		if path, err = c.client.BuildPath(path, params); err != nil {
-			return nil, err
-		}
-	}
+	path := c.client.BuildPath(fmt.Sprintf("/projects/%d/versions.json", projectID), params)
 	var result VersionList
 	if err := c.client.Get(ctx, path, &result); err != nil {
 		return nil, err

@@ -18,68 +18,6 @@ import (
 	"github.com/largeoliu/redmine-cli/internal/types"
 )
 
-// 模拟 BuildPath 错误
-// 由于 client.BuildPath 是内部方法，我们需要通过模拟服务器来触发错误
-
-// TestClient_List_BuildPathError 测试 List 方法中 BuildPath 返回错误的情况
-func TestClient_List_BuildPathError(t *testing.T) {
-	mock := testutil.NewMockServer(t)
-	defer mock.Close()
-
-	// 创建一个会返回错误查询参数的处理器
-	mock.Handle("/issues.json", func(w http.ResponseWriter, r *http.Request) {
-		// 返回正常响应
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(sampleIssueList())
-	})
-
-	baseClient := client.NewClient(mock.URL, "test-key")
-	issueClient := NewClient(baseClient)
-
-	// 使用正常参数
-	params := map[string]string{
-		"project_id": "1",
-	}
-
-	result, err := issueClient.List(context.Background(), params)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result == nil {
-		t.Fatal("expected result, got nil")
-	}
-}
-
-// TestClient_Get_BuildPathError 测试 Get 方法中 BuildPath 返回错误的情况
-func TestClient_Get_BuildPathError(t *testing.T) {
-	mock := testutil.NewMockServer(t)
-	defer mock.Close()
-
-	mock.Handle("/issues/1.json", func(w http.ResponseWriter, r *http.Request) {
-		response := map[string]any{
-			"issue": sampleIssue(),
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
-	})
-
-	baseClient := client.NewClient(mock.URL, "test-key")
-	issueClient := NewClient(baseClient)
-
-	// 使用正常参数
-	params := map[string]string{
-		"include": "relations",
-	}
-
-	result, err := issueClient.Get(context.Background(), 1, params)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result == nil {
-		t.Fatal("expected result, got nil")
-	}
-}
-
 // TestCreateCommand_WithTrackerAndCustomFields 测试创建命令带 tracker 和自定义字段
 func TestCreateCommand_WithTrackerAndCustomFields(t *testing.T) {
 	mock := testutil.NewMockServer(t)
