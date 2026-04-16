@@ -123,14 +123,14 @@ func promptSecret(reader *bufio.Reader, prompt string) string {
 		fmt.Print(prompt + ": ")
 	}
 
-	fd := int(os.Stdin.Fd())
+	fd := int(os.Stdin.Fd()) //nolint:gosec
 	oldState, err := term.MakeRaw(fd)
 	if err != nil {
-		input, _ := reader.ReadString('\n')
+		input, _ := reader.ReadString('\n') //nolint:errcheck
 		return strings.TrimSpace(input)
 	}
 	defer func() {
-		_ = term.Restore(fd, oldState)
+		_ = term.Restore(fd, oldState) //nolint:errcheck
 	}()
 
 	input, err := term.ReadPassword(fd)
