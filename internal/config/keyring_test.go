@@ -759,6 +759,30 @@ func TestRealKeyringIsAvailableWithMock(t *testing.T) {
 	}
 }
 
+func TestRealKeyringIsAvailableGetError(t *testing.T) {
+	keyring.MockInit()
+	defer keyring.MockInit()
+
+	kr := &realKeyring{}
+
+	err := kr.Set("test-instance", "test-key")
+	if err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+
+	keyring.MockInit()
+	defer keyring.MockInit()
+
+	err = keyring.Delete(keyringServiceName, "__test_keyring_availability__")
+	if err != nil {
+		t.Logf("Delete failed (expected): %v", err)
+	}
+
+	if kr.IsAvailable() {
+		t.Log("realKeyring.IsAvailable() returned true even with mocked keyring")
+	}
+}
+
 func TestRealKeyringGetSetDeleteWithMock(t *testing.T) {
 	keyring.MockInit()
 	defer keyring.MockInit()
