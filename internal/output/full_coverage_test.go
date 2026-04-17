@@ -1429,11 +1429,60 @@ func TestWriteJSONWithValidInput(t *testing.T) {
 	}
 }
 
+// TestNormalizePayloadWithMapStringAny tests normalizePayload with map[string]any input
+func TestNormalizePayloadWithMapStringAny(t *testing.T) {
+	input := map[string]any{
+		"key1": "value1",
+		"key2": 123,
+	}
+	result, err := normalizePayload(input)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Error("expected non-nil result")
+	}
+}
+
+// TestApplyJQWithMultipleValues tests ApplyJQ when iterator returns multiple values
+func TestApplyJQWithMultipleValues(t *testing.T) {
+	var buf bytes.Buffer
+	data := []int{1, 2, 3}
+	err := ApplyJQ(&buf, data, ".[]")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if buf.Len() == 0 {
+		t.Error("expected non-empty output")
+	}
+}
+
+// TestSelectFieldsWithNestedArraysNonMapItems tests SelectFields with arrays containing non-map items
+func TestSelectFieldsWithNestedArraysNonMapItems(t *testing.T) {
+	payload := map[string]any{
+		"id": 1,
+		"mixed": []any{
+			"string item",
+			123,
+			map[string]any{"name": "obj"},
+		},
+	}
+	result, err := SelectFields(payload, []string{"id"})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	m := result.(map[string]any)
+	mixed := m["mixed"].([]any)
+	if len(mixed) != 2 {
+		t.Errorf("expected 2 items (non-maps filtered), got %d", len(mixed))
+	}
+}
+
 // 确保 failAtSecondWriteWriter 实现了 io.Writer 接口
 var _ io.Writer = (*failAtSecondWriteWriter)(nil)
 
-// 确保 failAtFifthWriteWriter 实现了 io.Writer 接口
+// ensure failAtFifthWriteWriter implements io.Writer
 var _ io.Writer = (*failAtFifthWriteWriter)(nil)
 
-// 确保 failAtNinthWriteWriter 实现了 io.Writer 接口
+// ensure failAtNinthWriteWriter implements io.Writer
 var _ io.Writer = (*failAtNinthWriteWriter)(nil)

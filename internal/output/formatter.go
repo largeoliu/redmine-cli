@@ -72,10 +72,8 @@ func WriteTable(w io.Writer, payload any) error {
 	case map[string]any:
 		return writeKeyValues(w, typed)
 	case []any:
-		if headers, rows, ok := rowsFromSlice(typed); ok {
-			return writeTable(w, headers, rows)
-		}
-		return WriteRaw(w, normalized)
+		headers, rows, _ := rowsFromSlice(typed)
+		return writeTable(w, headers, rows)
 	default:
 		return WriteRaw(w, normalized)
 	}
@@ -229,7 +227,7 @@ func rowsFromSlice(items []any) ([]string, [][]string, bool) {
 		for _, item := range items {
 			rowMap, ok := item.(map[string]any)
 			if !ok {
-				continue
+				return nil, nil, false
 			}
 			row := make([]string, 0, len(headers))
 			for _, key := range headers {
