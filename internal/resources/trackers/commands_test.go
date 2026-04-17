@@ -220,3 +220,64 @@ func TestGetCommand_ResolveClientError(t *testing.T) {
 		t.Error("expected error from ResolveClient, got nil")
 	}
 }
+
+func TestGetCommand_ParseIDError(t *testing.T) {
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{}
+
+	cmd := newGetCommand(flags, resolver)
+	cmd.SetArgs([]string{"invalid"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from ParseID, got nil")
+	}
+}
+
+func TestGetCommand_APIError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleError("/trackers/1.json", http.StatusInternalServerError, "Internal Server Error")
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+	}
+
+	cmd := newGetCommand(flags, resolver)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from API, got nil")
+	}
+}
+
+func TestGetCommand_WriteOutputError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := Tracker{ID: 1, Name: "Bug"}
+	mock.HandleJSON("/trackers/1.json", response)
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return context.Canceled
+		},
+	}
+
+	cmd := newGetCommand(flags, resolver)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error from WriteOutput, got nil")
+	}
+}

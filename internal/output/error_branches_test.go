@@ -4,6 +4,7 @@ package output
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"testing"
 )
 
@@ -428,6 +429,61 @@ func TestWriteKeyValuesWithWriteError(t *testing.T) {
 	err := writeKeyValues(errWriter, data)
 	if err == nil {
 		t.Error("expected error from errorWriter")
+	}
+}
+
+// limitedErrorWriter succeeds for first N writes, then fails
+type limitedErrorWriter struct {
+	count   int
+	limit   int
+	failErr error
+}
+
+func (w *limitedErrorWriter) Write(p []byte) (n int, err error) {
+	w.count++
+	if w.count > w.limit {
+		return 0, w.failErr
+	}
+	return len(p), nil
+}
+
+// TestWriteDataRowsWithWriteError 测试 writeDataRows 的写入错误
+func TestWriteDataRowsWithWriteError(t *testing.T) {
+	// For row[0]: Fprintf (i=0), WriteString+Fprintf (i=1), Fprintln = 3 writes
+	// So we need limit=3 to fail on Fprintln
+	writer := &limitedErrorWriter{limit: 3, failErr: fmt.Errorf("write error at row")}
+	rows := [][]string{{"v1", "v2"}, {"v3", "v4"}}
+	widths := []int{10, 10}
+	err := writeDataRows(writer, rows, widths)
+	if err == nil {
+		t.Error("expected error from limitedErrorWriter")
+	}
+}
+
+// TestWriteTableWithNonMapNonSliceTypes tests the default branch in WriteTable
+func TestWriteTableWithDefaultCase(t *testing.T) {
+	var buf bytes.Buffer
+	// float64 would be the default case after normalizePayload
+	var data float64 = 3.14159
+	err := WriteTable(&buf, data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if buf.Len() == 0 {
+		t.Error("expected non-empty output for float64")
+	}
+}
+
+// TestWriteTableWithSliceNonMaps tests []any that isn't all maps
+func TestWriteTableWithSliceNonMaps(t *testing.T) {
+	var buf bytes.Buffer
+	data := []any{"string", 123, true}
+	err := WriteTable(&buf, data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if buf.Len() == 0 {
+		t.Error("expected non-empty output for non-map slice")
 	}
 }
 
