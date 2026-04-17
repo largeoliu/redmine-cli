@@ -998,6 +998,16 @@ func TestPromptSecretBoundaryCases(t *testing.T) {
 }
 
 // 测试 promptSecret 非终端环境下 fallback
+func TestPromptSecretEmptyPrompt(t *testing.T) {
+	input := "secret-with-empty-prompt\n"
+	reader := bufio.NewReader(strings.NewReader(input))
+	result := promptSecret(reader, "") // empty prompt - triggers the uncovered branch
+
+	if result != "secret-with-empty-prompt" {
+		t.Errorf("expected 'secret-with-empty-prompt', got %q", result)
+	}
+}
+
 func TestPromptSecretFallbackMode(t *testing.T) {
 	input := "fallback-secret\n"
 	reader := bufio.NewReader(strings.NewReader(input))
@@ -1352,6 +1362,10 @@ instances:
 }
 
 func TestRunLoginSetDefaultError(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("skipping: root bypasses file permission checks")
+	}
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/users/current.json" {
 			w.Header().Set("Content-Type", "application/json")
