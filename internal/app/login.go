@@ -148,8 +148,5 @@ func promptBool(reader *bufio.Reader, prompt string, defaultValue bool) bool {
 	}
 	input := promptInput(reader, prompt, defaultStr)
 	input = strings.ToLower(strings.TrimSpace(input))
-	if input == "" {
-		return defaultValue
-	}
 	return input == "y" || input == "yes"
 }

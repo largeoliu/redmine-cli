@@ -1428,3 +1428,71 @@ instances:
 		t.Error("expected error for set default failure, got nil")
 	}
 }
+
+func TestRunLoginSetDefaultErrorNonExistentInstance(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/users/current.json" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"user":{"id":1,"login":"test"}}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	os.Setenv("REDMINE_CONFIG_DIR", tmpDir)
+	defer os.Unsetenv("REDMINE_CONFIG_DIR")
+
+	configContent := `default: existing
+instances:
+  existing:
+    url: https://existing.example.com
+    api_key: existing-key
+`
+	configFile := filepath.Join(tmpDir, "config.yaml")
+	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	input := strings.Join([]string{
+		server.URL,
+		"test-api-key",
+		"new-instance",
+		"y",
+	}, "\n") + "\n"
+
+	oldStdin := os.Stdin
+	r, w, _ := os.Pipe()
+	os.Stdin = r
+
+	go func() {
+		defer w.Close()
+		w.Write([]byte(input))
+	}()
+
+	oldStdout := os.Stdout
+	rOut, wOut, _ := os.Pipe()
+	os.Stdout = wOut
+
+	ctx := context.Background()
+	flags := &GlobalFlags{}
+	err := runLogin(ctx, flags)
+
+	os.Stdin = oldStdin
+	wOut.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	io.Copy(&buf, rOut)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "登录成功") {
+		t.Errorf("expected success message, got: %s", output)
+	}
+}
