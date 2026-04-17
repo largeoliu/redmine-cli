@@ -112,6 +112,19 @@ func TestListCommand_MissingProjectID(t *testing.T) {
 	}
 }
 
+func TestListCommand_ZeroProjectID(t *testing.T) {
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{"--project-id", "0"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error for zero project-id, got nil")
+	}
+}
+
 func TestListCommand_ResolveClientError(t *testing.T) {
 	flags := &types.GlobalFlags{}
 	resolver := &mockResolver{
@@ -285,6 +298,19 @@ func TestCreateCommand_MissingProjectID(t *testing.T) {
 	err := cmd.Execute()
 	if err == nil {
 		t.Error("expected error for missing project-id, got nil")
+	}
+}
+
+func TestCreateCommand_ZeroProjectID(t *testing.T) {
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{}
+
+	cmd := newCreateCommand(flags, resolver)
+	cmd.SetArgs([]string{"--project-id", "0", "--name", "v1.0"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error for zero project-id, got nil")
 	}
 }
 
