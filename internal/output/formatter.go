@@ -225,7 +225,10 @@ func rowsFromSlice(items []any) ([]string, [][]string, bool) {
 		headers := sortedKeys(keys)
 		rows := make([][]string, 0, len(items))
 		for _, item := range items {
-			rowMap := item.(map[string]any)
+			rowMap, ok := item.(map[string]any)
+			if !ok {
+				return nil, nil, false
+			}
 			row := make([]string, 0, len(headers))
 			for _, key := range headers {
 				row = append(row, formatValue(rowMap[key]))
