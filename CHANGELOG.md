@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1](https://github.com/largeoliu/redmine-cli/compare/v0.2.0...v0.2.1) (2026-04-17)
+
+
+### Bug Fixes
+
+* install cosign before goreleaser ([#40](https://github.com/largeoliu/redmine-cli/issues/40)) ([3f36172](https://github.com/largeoliu/redmine-cli/commit/3f361721092e755364c677b892a4d23b8f90a195))
+
 ## [0.2.0](https://github.com/largeoliu/redmine-cli/compare/v0.1.2...v0.2.0) (2026-04-17)
 
 
