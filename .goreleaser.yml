@@ -63,16 +63,3 @@ release:
   draft: false
   prerelease: auto
   replace_existing_artifacts: false
-
-brews:
-  - name: redmine
-    repository:
-      owner: largeoliu
-      name: homebrew-tap
-    directory: Formula
-    homepage: https://github.com/largeoliu/redmine-cli
-    description: A CLI tool for Redmine
-    install: |
-      bin.install "redmine"
-    test: |
-      system "#{bin}/redmine", "version"
