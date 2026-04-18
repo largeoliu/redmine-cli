@@ -13,15 +13,15 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 info() {
-    echo "${GREEN}[INFO]${NC} $1"
+    echo "${GREEN}[INFO]${NC} $1" >&2
 }
 
 warn() {
-    echo "${YELLOW}[WARN]${NC} $1"
+    echo "${YELLOW}[WARN]${NC} $1" >&2
 }
 
 error() {
-    echo "${RED}[ERROR]${NC} $1"
+    echo "${RED}[ERROR]${NC} $1" >&2
     exit 1
 }
 
