@@ -105,7 +105,7 @@ func runUpgrade(checkOnly bool, targetVersion string) error {
 	if err != nil {
 		return err
 	}
-	defer binary.Close() //nolint:errcheck
+	defer binary.Close() //nolint:errcheck,gosec
 
 	exePath, err := osExecutableFunc()
 	if err != nil {
@@ -132,7 +132,7 @@ func fetchLatestRelease() (*githubRelease, error) {
 	if err != nil {
 		return nil, errors.NewNetwork("failed to fetch release info", errors.WithCause(err))
 	}
-	defer resp.Body.Close() //nolint:errcheck
+	defer resp.Body.Close() //nolint:errcheck,gosec
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.NewNetwork(
@@ -182,10 +182,10 @@ func compareVersions(current, latest string) int {
 	for i := 0; i < maxLen; i++ {
 		var c, l int
 		if i < len(currentParts) {
-			c, _ = strconv.Atoi(currentParts[i]) //nolint:errcheck
+			c, _ = strconv.Atoi(currentParts[i]) //nolint:errcheck,gosec
 		}
 		if i < len(latestParts) {
-			l, _ = strconv.Atoi(latestParts[i]) //nolint:errcheck
+			l, _ = strconv.Atoi(latestParts[i]) //nolint:errcheck,gosec
 		}
 		if c < l {
 			return -1
@@ -199,11 +199,11 @@ func compareVersions(current, latest string) int {
 }
 
 func downloadAndExtract(url, goos string) (io.ReadCloser, error) {
-	resp, err := httpGetFunc(url) //nolint:gosec
+	resp, err := httpGetFunc(url) //nolint:errcheck,gosec
 	if err != nil {
 		return nil, errors.NewNetwork("failed to download release archive", errors.WithCause(err))
 	}
-	defer resp.Body.Close() //nolint:errcheck
+	defer resp.Body.Close() //nolint:errcheck,gosec
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.NewNetwork(
@@ -219,16 +219,16 @@ func downloadAndExtract(url, goos string) (io.ReadCloser, error) {
 	archivePath := filepath.Join(tmpDir, "archive")
 	f, err := osCreateFunc(archivePath)
 	if err != nil {
-		os.RemoveAll(tmpDir) //nolint:errcheck
+		os.RemoveAll(tmpDir) //nolint:errcheck,gosec
 		return nil, errors.NewInternal("failed to create temp file", errors.WithCause(err))
 	}
 
 	if _, copyErr := ioCopyFunc(f, resp.Body); copyErr != nil {
-		f.Close()            //nolint:errcheck
-		os.RemoveAll(tmpDir) //nolint:errcheck
+		f.Close()            //nolint:errcheck,gosec
+		os.RemoveAll(tmpDir) //nolint:errcheck,gosec
 		return nil, errors.NewNetwork("failed to write archive", errors.WithCause(copyErr))
 	}
-	f.Close() //nolint:errcheck
+	f.Close() //nolint:errcheck,gosec
 
 	var binaryPath string
 
@@ -240,13 +240,13 @@ func downloadAndExtract(url, goos string) (io.ReadCloser, error) {
 	}
 
 	if err != nil {
-		os.RemoveAll(tmpDir) //nolint:errcheck
+		os.RemoveAll(tmpDir) //nolint:errcheck,gosec
 		return nil, errors.NewInternal("failed to extract archive", errors.WithCause(err))
 	}
 
 	binaryFile, err := osOpenFunc(binaryPath)
 	if err != nil {
-		os.RemoveAll(tmpDir) //nolint:errcheck
+		os.RemoveAll(tmpDir) //nolint:errcheck,gosec
 		return nil, errors.NewInternal("failed to open extracted binary", errors.WithCause(err))
 	}
 
@@ -260,7 +260,7 @@ type cleanupReadCloser struct {
 
 func (c *cleanupReadCloser) Close() error {
 	err := c.ReadCloser.Close()
-	os.RemoveAll(c.cleanupDir) //nolint:errcheck
+	os.RemoveAll(c.cleanupDir) //nolint:errcheck,gosec
 	return err
 }
 
@@ -269,13 +269,13 @@ func extractTarGz(archivePath, destDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer f.Close() //nolint:errcheck
+	defer f.Close() //nolint:errcheck,gosec
 
 	gzr, err := gzipNewReaderFunc(f)
 	if err != nil {
 		return "", err
 	}
-	defer gzr.Close() //nolint:errcheck
+	defer gzr.Close() //nolint:errcheck,gosec
 
 	tr := tar.NewReader(gzr)
 
@@ -300,10 +300,10 @@ func extractTarGz(archivePath, destDir string) (string, error) {
 				return "", err
 			}
 			if _, err := ioCopyFunc(outFile, io.LimitReader(tr, 100*1024*1024)); err != nil {
-				outFile.Close() //nolint:errcheck
+				outFile.Close() //nolint:errcheck,gosec
 				return "", err
 			}
-			outFile.Close() //nolint:errcheck
+			outFile.Close() //nolint:errcheck,gosec
 			return outPath, nil
 		}
 	}
@@ -316,7 +316,7 @@ func extractZip(archivePath, destDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer r.Close() //nolint:errcheck
+	defer r.Close() //nolint:errcheck,gosec
 
 	for _, f := range r.File {
 		name := filepath.Base(f.Name)
@@ -332,16 +332,16 @@ func extractZip(archivePath, destDir string) (string, error) {
 			}
 			rc, err := f.Open()
 			if err != nil {
-				outFile.Close() //nolint:errcheck
+				outFile.Close() //nolint:errcheck,gosec
 				return "", err
 			}
 			if _, err := ioCopyFunc(outFile, io.LimitReader(rc, 100*1024*1024)); err != nil {
-				rc.Close()      //nolint:errcheck
-				outFile.Close() //nolint:errcheck
+				rc.Close()      //nolint:errcheck,gosec
+				outFile.Close() //nolint:errcheck,gosec
 				return "", err
 			}
-			rc.Close()      //nolint:errcheck
-			outFile.Close() //nolint:errcheck
+			rc.Close()      //nolint:errcheck,gosec
+			outFile.Close() //nolint:errcheck,gosec
 			return outPath, nil
 		}
 	}
@@ -358,21 +358,21 @@ func replaceBinary(currentPath string, newBinary io.Reader) error {
 	tmpPath := tmpFile.Name()
 
 	if _, err := ioCopyFunc(tmpFile, newBinary); err != nil {
-		tmpFile.Close()    //nolint:errcheck
-		os.Remove(tmpPath) //nolint:errcheck
+		tmpFile.Close()    //nolint:errcheck,gosec
+		os.Remove(tmpPath) //nolint:errcheck,gosec
 		return errors.NewInternal("failed to write new binary", errors.WithCause(err))
 	}
 
 	if err := osChmodFunc(tmpFile, 0755); err != nil {
-		tmpFile.Close()    //nolint:errcheck
-		os.Remove(tmpPath) //nolint:errcheck
+		tmpFile.Close()    //nolint:errcheck,gosec
+		os.Remove(tmpPath) //nolint:errcheck,gosec
 		return errors.NewInternal("failed to set permissions on new binary", errors.WithCause(err))
 	}
 
-	tmpFile.Close() //nolint:errcheck
+	tmpFile.Close() //nolint:errcheck,gosec
 
 	if err := os.Rename(tmpPath, currentPath); err != nil {
-		os.Remove(tmpPath) //nolint:errcheck
+		os.Remove(tmpPath) //nolint:errcheck,gosec
 		return errors.NewInternal(
 			"failed to replace binary",
 			errors.WithCause(err),
