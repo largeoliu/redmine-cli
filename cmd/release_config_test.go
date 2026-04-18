@@ -137,6 +137,11 @@ func TestReleaseWorkflowMatchesConfiguredPublishTargets(t *testing.T) {
 	if _, exists := publishStep.Env["NODE_AUTH_TOKEN"]; !exists {
 		t.Fatal("expected npm publish step to use NODE_AUTH_TOKEN")
 	}
+
+	publishRun := findStepByName(t, npmJob, "Publish to npm")
+	if !strings.Contains(publishRun.Run, "--ignore-scripts") {
+		t.Fatalf("expected npm publish step to ignore lifecycle scripts, got %q", publishRun.Run)
+	}
 }
 
 func TestNPMPackageUsesStandaloneInstaller(t *testing.T) {
