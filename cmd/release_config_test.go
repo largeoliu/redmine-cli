@@ -39,8 +39,8 @@ func TestGoReleaserConfigUsesSupportedReleaseTargets(t *testing.T) {
 		t.Fatal("expected npm publishing to be moved out of GoReleaser")
 	}
 
-	if _, exists := config["brews"]; !exists {
-		t.Fatal("expected Homebrew section in .goreleaser.yml")
+	if _, exists := config["brews"]; exists {
+		t.Fatal("expected Homebrew section to be removed from .goreleaser.yml")
 	}
 
 	archives, ok := config["archives"].([]any)
