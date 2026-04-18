@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0](https://github.com/largeoliu/redmine-cli/compare/v0.2.5...v0.3.0) (2026-04-18)
+
+
+### Features
+
+* 添加 upgrade 命令 ([#51](https://github.com/largeoliu/redmine-cli/issues/51)) ([bdc99ce](https://github.com/largeoliu/redmine-cli/commit/bdc99ceebe289ad3014298559076bd045a97f56c))
+
 ## [0.2.5](https://github.com/largeoliu/redmine-cli/compare/v0.2.4...v0.2.5) (2026-04-18)
 
 
