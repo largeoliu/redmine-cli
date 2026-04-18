@@ -443,7 +443,10 @@ func createZipArchive(binaryName, content string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func createTarGzArchiveWithEntries(entries []struct{ name, content string; typeflag byte }) ([]byte, error) {
+func createTarGzArchiveWithEntries(entries []struct {
+	name, content string
+	typeflag      byte
+}) ([]byte, error) {
 	var buf bytes.Buffer
 	gzw := gzip.NewWriter(&buf)
 	tw := tar.NewWriter(gzw)
@@ -469,7 +472,10 @@ func createTarGzArchiveWithEntries(entries []struct{ name, content string; typef
 	return buf.Bytes(), nil
 }
 
-func createZipArchiveWithEntries(entries []struct{ name, content string; isDir bool }) ([]byte, error) {
+func createZipArchiveWithEntries(entries []struct {
+	name, content string
+	isDir         bool
+}) ([]byte, error) {
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
 
