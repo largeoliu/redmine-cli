@@ -21,14 +21,29 @@ import (
 )
 
 type githubRelease struct {
-	Tag    string         `json:"tag_name"`
-	Assets []githubAsset  `json:"assets"`
+	Tag    string        `json:"tag_name"`
+	Assets []githubAsset `json:"assets"`
 }
 
 type githubAsset struct {
 	Name        string `json:"name"`
 	DownloadURL string `json:"browser_download_url"`
 }
+
+var (
+	httpGetFunc          = http.Get
+	osExecutableFunc     = os.Executable
+	filepathEvalSymlinks = filepath.EvalSymlinks
+	osMkdirTempFunc      = os.MkdirTemp
+	osCreateFunc         = os.Create
+	osOpenFunc           = os.Open
+	osOpenFileFunc       = os.OpenFile
+	osCreateTempFunc     = os.CreateTemp
+	osChmodFunc          = func(f *os.File, mode os.FileMode) error { return f.Chmod(mode) }
+	ioCopyFunc           = io.Copy
+	gzipNewReaderFunc    = gzip.NewReader
+	zipOpenReaderFunc    = zip.OpenReader
+)
 
 func newUpgradeCommand() *cobra.Command {
 	var checkOnly bool
@@ -93,12 +108,12 @@ func runUpgrade(checkOnly bool, targetVersion string) error {
 	}
 	defer binary.Close()
 
-	exePath, err := os.Executable()
+	exePath, err := osExecutableFunc()
 	if err != nil {
 		return errors.NewInternal("failed to get current executable path", errors.WithCause(err))
 	}
 
-	exePath, err = filepath.EvalSymlinks(exePath)
+	exePath, err = filepathEvalSymlinks(exePath)
 	if err != nil {
 		return errors.NewInternal("failed to resolve executable path", errors.WithCause(err))
 	}
@@ -114,7 +129,7 @@ func runUpgrade(checkOnly bool, targetVersion string) error {
 func fetchLatestRelease() (*githubRelease, error) {
 	url := "https://api.github.com/repos/largeoliu/redmine-cli/releases/latest"
 
-	resp, err := http.Get(url)
+	resp, err := httpGetFunc(url)
 	if err != nil {
 		return nil, errors.NewNetwork("failed to fetch release info", errors.WithCause(err))
 	}
@@ -185,7 +200,7 @@ func compareVersions(current, latest string) int {
 }
 
 func downloadAndExtract(url, goos string) (io.ReadCloser, error) {
-	resp, err := http.Get(url) //nolint:gosec
+	resp, err := httpGetFunc(url) //nolint:gosec
 	if err != nil {
 		return nil, errors.NewNetwork("failed to download release archive", errors.WithCause(err))
 	}
@@ -197,19 +212,19 @@ func downloadAndExtract(url, goos string) (io.ReadCloser, error) {
 		)
 	}
 
-	tmpDir, err := os.MkdirTemp("", "redmine-upgrade-*")
+	tmpDir, err := osMkdirTempFunc("", "redmine-upgrade-*")
 	if err != nil {
 		return nil, errors.NewInternal("failed to create temp directory", errors.WithCause(err))
 	}
 
 	archivePath := filepath.Join(tmpDir, "archive")
-	f, err := os.Create(archivePath)
+	f, err := osCreateFunc(archivePath)
 	if err != nil {
 		os.RemoveAll(tmpDir)
 		return nil, errors.NewInternal("failed to create temp file", errors.WithCause(err))
 	}
 
-	if _, err := io.Copy(f, resp.Body); err != nil {
+	if _, err := ioCopyFunc(f, resp.Body); err != nil {
 		f.Close()
 		os.RemoveAll(tmpDir)
 		return nil, errors.NewNetwork("failed to write archive", errors.WithCause(err))
@@ -230,7 +245,7 @@ func downloadAndExtract(url, goos string) (io.ReadCloser, error) {
 		return nil, errors.NewInternal("failed to extract archive", errors.WithCause(err))
 	}
 
-	binaryFile, err := os.Open(binaryPath)
+	binaryFile, err := osOpenFunc(binaryPath)
 	if err != nil {
 		os.RemoveAll(tmpDir)
 		return nil, errors.NewInternal("failed to open extracted binary", errors.WithCause(err))
@@ -251,13 +266,13 @@ func (c *cleanupReadCloser) Close() error {
 }
 
 func extractTarGz(archivePath, destDir string) (string, error) {
-	f, err := os.Open(archivePath)
+	f, err := osOpenFunc(archivePath)
 	if err != nil {
 		return "", err
 	}
 	defer f.Close()
 
-	gzr, err := gzip.NewReader(f)
+	gzr, err := gzipNewReaderFunc(f)
 	if err != nil {
 		return "", err
 	}
@@ -281,11 +296,11 @@ func extractTarGz(archivePath, destDir string) (string, error) {
 
 		if name == "redmine" || name == "redmine.exe" {
 			outPath := filepath.Join(destDir, name)
-			outFile, err := os.OpenFile(outPath, os.O_CREATE|os.O_WRONLY, 0755)
+			outFile, err := osOpenFileFunc(outPath, os.O_CREATE|os.O_WRONLY, 0755)
 			if err != nil {
 				return "", err
 			}
-			if _, err := io.Copy(outFile, io.LimitReader(tr, 100*1024*1024)); err != nil {
+			if _, err := ioCopyFunc(outFile, io.LimitReader(tr, 100*1024*1024)); err != nil {
 				outFile.Close()
 				return "", err
 			}
@@ -298,7 +313,7 @@ func extractTarGz(archivePath, destDir string) (string, error) {
 }
 
 func extractZip(archivePath, destDir string) (string, error) {
-	r, err := zip.OpenReader(archivePath)
+	r, err := zipOpenReaderFunc(archivePath)
 	if err != nil {
 		return "", err
 	}
@@ -312,7 +327,7 @@ func extractZip(archivePath, destDir string) (string, error) {
 
 		if name == "redmine" || name == "redmine.exe" {
 			outPath := filepath.Join(destDir, name)
-			outFile, err := os.OpenFile(outPath, os.O_CREATE|os.O_WRONLY, 0755)
+			outFile, err := osOpenFileFunc(outPath, os.O_CREATE|os.O_WRONLY, 0755)
 			if err != nil {
 				return "", err
 			}
@@ -321,7 +336,7 @@ func extractZip(archivePath, destDir string) (string, error) {
 				outFile.Close()
 				return "", err
 			}
-			if _, err := io.Copy(outFile, io.LimitReader(rc, 100*1024*1024)); err != nil {
+			if _, err := ioCopyFunc(outFile, io.LimitReader(rc, 100*1024*1024)); err != nil {
 				rc.Close()
 				outFile.Close()
 				return "", err
@@ -337,19 +352,19 @@ func extractZip(archivePath, destDir string) (string, error) {
 
 func replaceBinary(currentPath string, newBinary io.Reader) error {
 	dir := filepath.Dir(currentPath)
-	tmpFile, err := os.CreateTemp(dir, "redmine-upgrade-*")
+	tmpFile, err := osCreateTempFunc(dir, "redmine-upgrade-*")
 	if err != nil {
 		return errors.NewInternal("failed to create temp file for replacement", errors.WithCause(err))
 	}
 	tmpPath := tmpFile.Name()
 
-	if _, err := io.Copy(tmpFile, newBinary); err != nil {
+	if _, err := ioCopyFunc(tmpFile, newBinary); err != nil {
 		tmpFile.Close()
 		os.Remove(tmpPath)
 		return errors.NewInternal("failed to write new binary", errors.WithCause(err))
 	}
 
-	if err := tmpFile.Chmod(0755); err != nil {
+	if err := osChmodFunc(tmpFile, 0755); err != nil {
 		tmpFile.Close()
 		os.Remove(tmpPath)
 		return errors.NewInternal("failed to set permissions on new binary", errors.WithCause(err))
