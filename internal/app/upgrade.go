@@ -220,16 +220,16 @@ func downloadAndExtract(url, goos string) (io.ReadCloser, error) {
 	archivePath := filepath.Join(tmpDir, "archive")
 	f, err := osCreateFunc(archivePath)
 	if err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 		return nil, errors.NewInternal("failed to create temp file", errors.WithCause(err))
 	}
 
-	if _, err := ioCopyFunc(f, resp.Body); err != nil {
-		f.Close()
-		os.RemoveAll(tmpDir)
-		return nil, errors.NewNetwork("failed to write archive", errors.WithCause(err))
+	if _, copyErr := ioCopyFunc(f, resp.Body); copyErr != nil {
+		_ = f.Close()
+		_ = os.RemoveAll(tmpDir)
+		return nil, errors.NewNetwork("failed to write archive", errors.WithCause(copyErr))
 	}
-	f.Close()
+	_ = f.Close()
 
 	var binaryPath string
 
@@ -241,13 +241,13 @@ func downloadAndExtract(url, goos string) (io.ReadCloser, error) {
 	}
 
 	if err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 		return nil, errors.NewInternal("failed to extract archive", errors.WithCause(err))
 	}
 
 	binaryFile, err := osOpenFunc(binaryPath)
 	if err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 		return nil, errors.NewInternal("failed to open extracted binary", errors.WithCause(err))
 	}
 
@@ -261,7 +261,7 @@ type cleanupReadCloser struct {
 
 func (c *cleanupReadCloser) Close() error {
 	err := c.ReadCloser.Close()
-	os.RemoveAll(c.cleanupDir)
+	_ = os.RemoveAll(c.cleanupDir)
 	return err
 }
 
@@ -270,13 +270,13 @@ func extractTarGz(archivePath, destDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	gzr, err := gzipNewReaderFunc(f)
 	if err != nil {
 		return "", err
 	}
-	defer gzr.Close()
+	defer func() { _ = gzr.Close() }()
 
 	tr := tar.NewReader(gzr)
 
@@ -301,10 +301,10 @@ func extractTarGz(archivePath, destDir string) (string, error) {
 				return "", err
 			}
 			if _, err := ioCopyFunc(outFile, io.LimitReader(tr, 100*1024*1024)); err != nil {
-				outFile.Close()
+				_ = outFile.Close()
 				return "", err
 			}
-			outFile.Close()
+			_ = outFile.Close()
 			return outPath, nil
 		}
 	}
@@ -317,7 +317,7 @@ func extractZip(archivePath, destDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	for _, f := range r.File {
 		name := filepath.Base(f.Name)
@@ -333,16 +333,16 @@ func extractZip(archivePath, destDir string) (string, error) {
 			}
 			rc, err := f.Open()
 			if err != nil {
-				outFile.Close()
+				_ = outFile.Close()
 				return "", err
 			}
 			if _, err := ioCopyFunc(outFile, io.LimitReader(rc, 100*1024*1024)); err != nil {
-				rc.Close()
-				outFile.Close()
+				_ = rc.Close()
+				_ = outFile.Close()
 				return "", err
 			}
-			rc.Close()
-			outFile.Close()
+			_ = rc.Close()
+			_ = outFile.Close()
 			return outPath, nil
 		}
 	}
@@ -359,21 +359,21 @@ func replaceBinary(currentPath string, newBinary io.Reader) error {
 	tmpPath := tmpFile.Name()
 
 	if _, err := ioCopyFunc(tmpFile, newBinary); err != nil {
-		tmpFile.Close()
-		os.Remove(tmpPath)
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpPath)
 		return errors.NewInternal("failed to write new binary", errors.WithCause(err))
 	}
 
 	if err := osChmodFunc(tmpFile, 0755); err != nil {
-		tmpFile.Close()
-		os.Remove(tmpPath)
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpPath)
 		return errors.NewInternal("failed to set permissions on new binary", errors.WithCause(err))
 	}
 
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	if err := os.Rename(tmpPath, currentPath); err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return errors.NewInternal(
 			"failed to replace binary",
 			errors.WithCause(err),
