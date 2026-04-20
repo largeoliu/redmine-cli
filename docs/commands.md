@@ -5,6 +5,7 @@
 - [全局参数](#全局参数)
 - [认证](#认证)
 - [配置](#配置)
+- [Agile](#agile)
 - [Issues](#issues)
 - [Projects](#projects)
 - [Users](#users)
@@ -80,6 +81,31 @@ redmine config set <instance-name>
 ```bash
 redmine config list
 ```
+
+---
+
+## Agile
+
+### agile board
+
+显示项目当前 Sprint 和 `No Sprint` 中的 issue 内容，适合快速查看迭代里有哪些卡片。
+
+```bash
+redmine agile board city --format raw
+redmine agile board 42 --format table
+```
+
+**参数：**
+
+| 参数 | 说明 |
+|------|------|
+| `<project>` | 项目 ID 或 identifier |
+
+**输出：**
+
+- `raw`：文本分组输出，按 Sprint 展示卡片内容
+- `table`：扁平表格输出，包含 Sprint 列
+- `json`：结构化报告，包含 `project`、`current_sprint`、`groups` 和 `cards`
 
 ---
 

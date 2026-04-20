@@ -23,6 +23,9 @@ redmine issue create --project-id 1 --subject "Bug report"
 
 # 获取 issue 详情
 redmine issue get 123
+
+# 查看 agile 内容
+redmine agile board city --format raw
 ```
 
 ### 输出控制
