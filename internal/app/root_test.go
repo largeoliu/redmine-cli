@@ -56,6 +56,8 @@ func TestRootCommandHasSubcommands(t *testing.T) {
 		"logout",
 		"version",
 		"config",
+		"sprint",
+		"agile",
 		"category",
 		"issue",
 		"priority",
@@ -913,6 +915,8 @@ func TestWriteOutputSelectFieldsMarshalError(t *testing.T) {
 }
 
 func TestResolverResolveClientError(t *testing.T) {
+	t.Setenv("REDMINE_CONFIG_DIR", t.TempDir())
+
 	r := &resolver{}
 	flags := &types.GlobalFlags{}
 	_, err := r.ResolveClient(flags)

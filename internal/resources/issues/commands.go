@@ -216,6 +216,7 @@ func NewCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Comman
 
 func newListCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Command {
 	listFlags := &ListFlags{}
+	var trackerSelector string
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List issues",
@@ -232,6 +233,18 @@ func newListCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Co
 			if err != nil {
 				return err
 			}
+			if cmd.Flags().Changed("tracker") {
+				switch {
+				case trackerSelector == "", strings.EqualFold(trackerSelector, "全部"), strings.EqualFold(trackerSelector, "all"):
+					listFlags.TrackerID = 0
+				default:
+					trackerDef, trackerErr := trackers.NewClient(c).FindByName(cmd.Context(), trackerSelector)
+					if trackerErr != nil {
+						return trackerErr
+					}
+					listFlags.TrackerID = trackerDef.ID
+				}
+			}
 			params := BuildListParams(*listFlags)
 			result, err := NewClient(c).List(cmd.Context(), params)
 			if err != nil {
@@ -241,6 +254,7 @@ func newListCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Co
 		},
 	}
 	cmd.Flags().IntVar(&listFlags.ProjectID, "project-id", 0, "Filter by project ID")
+	cmd.Flags().StringVar(&trackerSelector, "tracker", "", "Filter by tracker name (use 全部 to skip filtering)")
 	cmd.Flags().IntVar(&listFlags.TrackerID, "tracker-id", 0, "Filter by tracker ID")
 	cmd.Flags().IntVar(&listFlags.StatusID, "status-id", 0, "Filter by status ID")
 	cmd.Flags().IntVar(&listFlags.AssignedToID, "assigned-to-id", 0, "Filter by assigned user ID")

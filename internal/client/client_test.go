@@ -819,7 +819,7 @@ func TestPingInvalidURL(t *testing.T) {
 }
 
 func TestPingUnreachable(t *testing.T) {
-	c := NewClient("http://invalid-host-that-does-not-exist.example", "test-key")
+	c := NewClient("http://localhost:99999", "test-key")
 	err := c.Ping(context.Background())
 	if err == nil {
 		t.Fatal("expected error for unreachable host, got nil")
