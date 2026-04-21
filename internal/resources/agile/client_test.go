@@ -107,15 +107,16 @@ func TestClient_GetSprint(t *testing.T) {
 		AgileSprint Sprint `json:"agile_sprint"`
 	}{
 		AgileSprint: Sprint{
-			ID:         7,
-			Name:       "Sprint 7",
-			Status:     "active",
-			StartDate:  "2026-04-01",
-			EndDate:    "2026-04-14",
-			Goal:       "Finish release scope",
-			IsDefault:  true,
-			IsClosed:   false,
-			IsArchived: false,
+			ID:          7,
+			Name:        "Sprint 7",
+			Description: "Release hardening",
+			Status:      "active",
+			StartDate:   "2026-04-01",
+			EndDate:     "2026-04-14",
+			Goal:        "Finish release scope",
+			IsDefault:   true,
+			IsClosed:    false,
+			IsArchived:  false,
 		},
 	}
 	mock.HandleJSON("/projects/42/agile_sprints/7.json", response)
@@ -132,6 +133,9 @@ func TestClient_GetSprint(t *testing.T) {
 	}
 	if result.StartDate != "2026-04-01" {
 		t.Fatalf("expected start date 2026-04-01, got %s", result.StartDate)
+	}
+	if result.Description != "Release hardening" {
+		t.Fatalf("expected description to be populated, got %q", result.Description)
 	}
 }
 

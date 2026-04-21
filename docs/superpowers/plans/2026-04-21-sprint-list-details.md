@@ -1,12 +1,12 @@
-# Sprint List Details Implementation Plan
+# Sprint 列表详情实现计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **面向智能体工作器：** 必需子技能：使用 superpowers:subagent-driven-development（推荐）或 superpowers:executing-plans 来逐步实现此计划任务。步骤使用复选框（`- [ ]`）语法进行跟踪。
 
-**Goal:** Add `redmine sprint list <project> --details` so sprint listings can optionally expand to full sprint records.
+**目标：** 添加 `redmine sprint list <project> --details` 功能，使 sprint 列表可以选择性地扩展为完整的 sprint 记录。
 
-**Architecture:** Keep `sprint` as a thin Cobra wrapper. The command fetches the sprint index once, then either returns the lightweight slice or fans out per-sprint `GetSprint` calls through `client.BatchGetFunc` when `--details` is enabled. The shared output pipeline still owns JSON/table/raw formatting, so the command only decides which `[]agile.Sprint` slice to pass downstream.
+**架构设计：** 保持 `sprint` 作为精简的 Cobra 包装器。命令获取一次 sprint 索引，然后要么返回轻量级切片，要么在启用 `--details` 时通过 `client.BatchGetFunc` 扇出每个 sprint 的 `GetSprint` 调用。共享的输出管道仍然负责 JSON/table/raw 格式化，因此命令只需要决定将哪个 `[]agile.Sprint` 切片传递给下游。
 
-**Tech Stack:** Go 1.23, Cobra, `internal/client.BatchGetFunc`, existing `resolver.WriteOutput`, `gofmt`
+**技术栈：** Go 1.23, Cobra, `internal/client.BatchGetFunc`, 现有的 `resolver.WriteOutput`, `gofmt`
 
 ---
 
@@ -19,15 +19,15 @@
 - Modify: `docs/commands.md`
 - Modify: `docs/README.md`
 
-### Task 1: Expand the sprint model
+### 任务 1：扩展 sprint 模型
 
-**Files:**
-- Modify: `internal/resources/agile/types.go`
-- Modify: `internal/resources/agile/client_test.go`
+**文件：**
+- 修改：`internal/resources/agile/types.go`
+- 修改：`internal/resources/agile/client_test.go`
 
-- [ ] **Step 1: Add the failing assertion first**
+- [ ] **步骤 1：先添加失败的断言**
 
-Update `TestClient_GetSprint` so it expects the detail payload to include a description:
+更新 `TestClient_GetSprint` 使其期望详情负载包含描述字段：
 
 ```go
 response := struct {
@@ -50,19 +50,19 @@ if result.Description != "Release hardening" {
 }
 ```
 
-- [ ] **Step 2: Verify the test fails for the right reason**
+- [ ] **步骤 2：验证测试因正确原因失败**
 
-Run:
+运行：
 
 ```bash
 GOCACHE=/tmp/redmine-go-cache go test ./internal/resources/agile -run '^TestClient_GetSprint$' -v
 ```
 
-Expected: fail because `Sprint` does not yet carry `Description`.
+预期：失败，因为 `Sprint` 尚未携带 `Description` 字段。
 
-- [ ] **Step 3: Add the model field**
+- [ ] **步骤 3：添加模型字段**
 
-Change `Sprint` to include the missing field:
+更改 `Sprint` 以包含缺失的字段：
 
 ```go
 type Sprint struct {
@@ -79,36 +79,36 @@ type Sprint struct {
 }
 ```
 
-Keep the existing `SprintList` compatibility shim intact so both `agile_sprints` and `sprints` payloads still decode.
+保持现有的 `SprintList` 兼容性垫片不变，以便 `agile_sprints` 和 `sprints` 负载都能正确解码。
 
-- [ ] **Step 4: Verify the test passes**
+- [ ] **步骤 4：验证测试通过**
 
-Run:
+运行：
 
 ```bash
 GOCACHE=/tmp/redmine-go-cache go test ./internal/resources/agile -run '^TestClient_GetSprint$' -v
 ```
 
-Expected: PASS.
+预期：通过。
 
-- [ ] **Step 5: Commit the model change**
+- [ ] **步骤 5：提交模型更改**
 
 ```bash
 git add internal/resources/agile/types.go internal/resources/agile/client_test.go
-git commit -m "feat(agile): include sprint description in sprint detail"
+git commit -m "feat(agile): 在 sprint 详情中包含描述字段"
 ```
 
 ---
 
-### Task 2: Add `--details` expansion to `sprint list`
+### 任务 2：为 `sprint list` 添加 `--details` 扩展
 
-**Files:**
-- Modify: `internal/resources/sprints/commands.go`
-- Modify: `internal/resources/sprints/commands_test.go`
+**文件：**
+- 修改：`internal/resources/sprints/commands.go`
+- 修改：`internal/resources/sprints/commands_test.go`
 
-- [ ] **Step 1: Write the failing tests**
+- [ ] **步骤 1：编写失败的测试**
 
-Add one success test, one table-render test, and one error test.
+添加一个成功测试、一个表格渲染测试和一个错误测试。
 
 ```go
 func newSprintDetailsClient(t *testing.T) *client.Client {
@@ -269,7 +269,7 @@ func TestListCommand_DetailsPropagatesDetailError(t *testing.T) {
 }
 ```
 
-Use a transport-backed client in the test so these paths are covered without `httptest`:
+使用传输层支持的客户端进行测试，这样可以在不使用 `httptest` 的情况下覆盖这些路径：
 
 ```go
 Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
@@ -289,19 +289,19 @@ Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
 })
 ```
 
-- [ ] **Step 2: Verify the tests fail**
+- [ ] **步骤 2：验证测试失败**
 
-Run:
+运行：
 
 ```bash
 GOCACHE=/tmp/redmine-go-cache go test ./internal/resources/sprints -run 'TestListCommand_DetailsExpandsSprintPayload|TestListCommand_DetailsPropagatesDetailError|TestListCommand_DetailsRendersTablePayload' -v
 ```
 
-Expected: fail because `--details` is not wired up yet and the detail payload is still lightweight.
+预期：失败，因为 `--details` 尚未连接，且详情负载仍然是轻量级的。
 
-- [ ] **Step 3: Implement the expansion path**
+- [ ] **步骤 3：实现扩展路径**
 
-Add a `--details` flag and branch the command output:
+添加 `--details` 标志并分支命令输出：
 
 ```go
 details := false
@@ -318,7 +318,7 @@ if details {
 return resolver.WriteOutput(cmd.OutOrStdout(), flags, payload)
 ```
 
-Use `client.BatchGetFunc` so detail requests run concurrently and preserve list order:
+使用 `client.BatchGetFunc` 使详情请求并发运行并保持列表顺序：
 
 ```go
 func loadSprintDetails(ctx context.Context, c *client.Client, projectID int, sprints []agilepkg.Sprint) ([]agilepkg.Sprint, error) {
@@ -346,34 +346,34 @@ func loadSprintDetails(ctx context.Context, c *client.Client, projectID int, spr
 }
 ```
 
-- [ ] **Step 4: Verify the command tests pass**
+- [ ] **步骤 4：验证命令测试通过**
 
-Run:
+运行：
 
 ```bash
 GOCACHE=/tmp/redmine-go-cache go test ./internal/resources/sprints -run 'TestListCommand_DetailsExpandsSprintPayload|TestListCommand_DetailsPropagatesDetailError' -v
 ```
 
-Expected: PASS.
+预期：通过。
 
-- [ ] **Step 5: Commit the command change**
+- [ ] **步骤 5：提交命令更改**
 
 ```bash
 git add internal/resources/sprints/commands.go internal/resources/sprints/commands_test.go
-git commit -m "feat(sprint): add optional detailed sprint listing"
+git commit -m "feat(sprint): 添加可选的详细 sprint 列表功能"
 ```
 
 ---
 
-### Task 3: Update docs and final verification
+### 任务 3：更新文档和最终验证
 
-**Files:**
-- Modify: `docs/commands.md`
-- Modify: `docs/README.md`
+**文件：**
+- 修改：`docs/commands.md`
+- 修改：`docs/README.md`
 
-- [ ] **Step 1: Update the user docs**
+- [ ] **步骤 1：更新用户文档**
 
-Add `--details` to the sprint command docs:
+将 `--details` 添加到 sprint 命令文档中：
 
 ```md
 redmine sprint list city --details --format table
@@ -385,22 +385,22 @@ redmine sprint list city --details --format table
 - `raw`：单行 JSON
 ```
 
-Also add the same example to `docs/README.md` quick links.
+同时将相同的示例添加到 `docs/README.md` 的快速链接中。
 
-- [ ] **Step 2: Verify the documentation-linked tests pass**
+- [ ] **步骤 2：验证与文档相关的测试通过**
 
-Run:
+运行：
 
 ```bash
 GOCACHE=/tmp/redmine-go-cache go test ./internal/app ./internal/resources/agile ./internal/resources/sprints
 rg -n "sprint list|--details" docs/commands.md docs/README.md
 ```
 
-Expected: PASS.
+预期：通过。
 
-- [ ] **Step 3: Commit the docs update**
+- [ ] **步骤 3：提交文档更新**
 
 ```bash
 git add docs/commands.md docs/README.md
-git commit -m "docs: document detailed sprint listing"
+git commit -m "docs: 记录详细 sprint 列表功能"
 ```

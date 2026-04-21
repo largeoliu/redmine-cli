@@ -30,6 +30,7 @@ redmine agile board city --sprint 8 --tracker 需求 --format raw
 
 # 查看 sprint 列表
 redmine sprint list city --format table
+redmine sprint list city --details --format table
 ```
 
 ### 输出控制

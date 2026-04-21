@@ -121,6 +121,7 @@ redmine agile board 42 --sprint 8 --tracker 需求 --format table
 ```bash
 redmine sprint list city --format table
 redmine sprint list 42 --format json
+redmine sprint list city --details --format table
 ```
 
 **参数：**
@@ -128,10 +129,11 @@ redmine sprint list 42 --format json
 | 参数 | 说明 |
 |------|------|
 | `<project>` | 项目 ID 或 identifier |
+| `--details` | 展开每个 sprint 为完整详情后输出 |
 
 **输出：**
 
-- `json`：sprint 数组
+- `json`：sprint 数组，`--details` 时包含完整字段
 - `table`：展示 sprint 的全部字段
 - `raw`：单行 JSON
 

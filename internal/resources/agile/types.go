@@ -2,15 +2,16 @@ package agile
 
 // Sprint represents a Redmine agile sprint.
 type Sprint struct {
-	ID         int    `json:"id"`
-	Name       string `json:"name"`
-	Status     string `json:"status,omitempty"`
-	StartDate  string `json:"start_date,omitempty"`
-	EndDate    string `json:"end_date,omitempty"`
-	Goal       string `json:"goal,omitempty"`
-	IsDefault  bool   `json:"is_default,omitempty"`
-	IsClosed   bool   `json:"is_closed,omitempty"`
-	IsArchived bool   `json:"is_archived,omitempty"`
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Status      string `json:"status,omitempty"`
+	StartDate   string `json:"start_date,omitempty"`
+	EndDate     string `json:"end_date,omitempty"`
+	Goal        string `json:"goal,omitempty"`
+	IsDefault   bool   `json:"is_default,omitempty"`
+	IsClosed    bool   `json:"is_closed,omitempty"`
+	IsArchived  bool   `json:"is_archived,omitempty"`
 }
 
 // SprintList represents a list of agile sprints.

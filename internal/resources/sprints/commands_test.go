@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/largeoliu/redmine-cli/internal/client"
-	agilepkg "github.com/largeoliu/redmine-cli/internal/resources/agile"
-	projectspkg "github.com/largeoliu/redmine-cli/internal/resources/projects"
+	"github.com/largeoliu/redmine-cli/internal/output"
+	"github.com/largeoliu/redmine-cli/internal/resources/agile"
+	"github.com/largeoliu/redmine-cli/internal/resources/projects"
 	"github.com/largeoliu/redmine-cli/internal/types"
 )
 
@@ -56,7 +58,7 @@ func TestListCommand_Success(t *testing.T) {
 			switch req.URL.Path {
 			case "/projects/42.json":
 				return jsonHTTPResponse(t, http.StatusOK, map[string]any{
-					"project": projectspkg.Project{ID: 42, Name: "City", Identifier: "city"},
+					"project": projects.Project{ID: 42, Name: "City", Identifier: "city"},
 				}), nil
 			case "/projects/42/agile_sprints.json":
 				return jsonHTTPResponse(t, http.StatusOK, map[string]any{
@@ -106,7 +108,7 @@ func TestListCommand_Success(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	sprints, ok := payload.([]agilepkg.Sprint)
+	sprints, ok := payload.([]agile.Sprint)
 	if !ok {
 		t.Fatalf("expected []agile.Sprint payload, got %T", payload)
 	}
@@ -137,5 +139,107 @@ func jsonHTTPResponse(t *testing.T, status int, payload any) *http.Response {
 		Status:     http.StatusText(status),
 		Header:     make(http.Header),
 		Body:       io.NopCloser(bytes.NewReader(data)),
+	}
+}
+
+func newSprintDetailsClient(t *testing.T) *client.Client {
+	t.Helper()
+	return client.NewClient("https://example.com", "test-key", client.WithHTTPClient(&http.Client{
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			switch req.URL.Path {
+			case "/projects/42.json":
+				return jsonHTTPResponse(t, http.StatusOK, map[string]any{
+					"project": projects.Project{ID: 42, Name: "City", Identifier: "city"},
+				}), nil
+			case "/projects/42/agile_sprints.json":
+				return jsonHTTPResponse(t, http.StatusOK, map[string]any{
+					"project_id":   42,
+					"project_name": "City",
+					"sprints": []map[string]any{
+						{"id": 7, "name": "Sprint 7", "status": "active", "description": "Release hardening", "start_date": "2026-04-01", "end_date": "2026-04-14"},
+						{"id": 8, "name": "Sprint 8", "status": "open", "description": "Stabilization", "start_date": "2026-04-15", "end_date": "2026-04-28"},
+					},
+				}), nil
+			default:
+				t.Fatalf("unexpected path: %s", req.URL.Path)
+				return nil, nil
+			}
+		}),
+	}))
+}
+
+func newSprintDetailsErrorClient(t *testing.T) *client.Client {
+	t.Helper()
+	return client.NewClient("https://example.com", "test-key", client.WithHTTPClient(&http.Client{
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			switch req.URL.Path {
+			case "/projects/42.json":
+				return jsonHTTPResponse(t, http.StatusOK, map[string]any{
+					"project": projects.Project{ID: 42, Name: "City", Identifier: "city"},
+				}), nil
+			case "/projects/42/agile_sprints.json":
+				return jsonHTTPResponse(t, http.StatusOK, map[string]any{
+					"project_id":   42,
+					"project_name": "City",
+					"sprints": []map[string]any{
+						{"id": 7, "name": "Sprint 7", "status": "active", "description": "Release hardening"},
+						{"id": 8, "name": "Sprint 8", "status": "open", "description": "Stabilization"},
+					},
+				}), nil
+			default:
+				t.Fatalf("unexpected path: %s", req.URL.Path)
+				return nil, nil
+			}
+		}),
+	}))
+}
+
+func TestListCommand_DetailsExpandsSprintPayload(t *testing.T) {
+	flags := &types.GlobalFlags{Format: "json"}
+	var payload any
+	c := newSprintDetailsClient(t)
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) { return c, nil },
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, p any) error {
+			payload = p
+			return nil
+		},
+	}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{"--details", "42"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	sprints, ok := payload.([]agile.Sprint)
+	if !ok {
+		t.Fatalf("expected []agile.Sprint payload, got %T", payload)
+	}
+	if sprints[0].Description != "Release hardening" {
+		t.Fatalf("expected expanded description, got %+v", sprints[0])
+	}
+}
+
+func TestListCommand_DetailsRendersTablePayload(t *testing.T) {
+	flags := &types.GlobalFlags{Format: "table"}
+	var rendered bytes.Buffer
+	c := newSprintDetailsClient(t)
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) { return c, nil },
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, p any) error {
+			return output.Write(&rendered, output.FormatTable, p)
+		},
+	}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{"--details", "42"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(rendered.String(), "Release hardening") {
+		t.Fatalf("expected table rendering to include the description, got:\n%s", rendered.String())
 	}
 }
