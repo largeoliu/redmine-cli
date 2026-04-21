@@ -95,6 +95,12 @@ jobs:
         with:
           go-version: '1.23'
 
+      - name: Install cosign
+        run: |
+          curl -sLO https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64
+          chmod +x cosign-linux-amd64
+          mv cosign-linux-amd64 /usr/local/bin/cosign
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v7
         with:
@@ -109,14 +115,16 @@ jobs:
           curl -sLO https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64
           chmod +x cosign-linux-amd64
           mv cosign-linux-amd64 /usr/local/bin/cosign
-          for sig in dist/*.checksums.txt.sig; do
-            cosign verify-blob \
-              --certificate "${sig%.sig}.pem" \
-              --signature "$sig" \
-              --certificate-identity "${{ github.server_url }}/${{ github.repository }}/.github/workflows/release.yml@${{ github.ref }}" \
-              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-              "${sig%.sig}" || echo "Warning: signature verification failed for $sig"
-          done
+          bundle=dist/checksums.txt.sigstore.json
+          if [ ! -f "$bundle" ]; then
+            echo "No bundle files found in dist"
+            exit 1
+          fi
+          cosign verify-blob \
+            --bundle "$bundle" \
+            --certificate-identity "${{ github.server_url }}/${{ github.repository }}/.github/workflows/release.yml@${{ github.ref }}" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "${bundle%.sigstore.json}"
 
   npm-publish:
     runs-on: ubuntu-latest
@@ -135,6 +143,6 @@ jobs:
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
 
       - name: Publish to npm
-        run: npm publish --access public
+        run: npm publish --access public --ignore-scripts
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

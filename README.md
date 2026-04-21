@@ -10,6 +10,7 @@ AI Agent 友好的 Redmine 命令行工具。
 - **输出格式灵活**：支持 json、table、raw 三种输出格式
 - **分页和过滤**：支持 `--limit`、`--offset` 分页，以及多种过滤条件
 - **Dry Run 模式**：预览操作结果，避免误操作
+- **自动升级**：一行命令自动升级到最新版本或指定版本
 
 ## 安装
 
@@ -59,6 +60,21 @@ go install github.com/largeoliu/redmine-cli/cmd@latest
 ```
 
 安装后的二进制文件位于 `$(go env GOPATH)/bin/redmine`，请确保该目录在您的 PATH 中。
+
+## 升级
+
+安装后，可通过 `upgrade` 命令升级到最新版本：
+
+```bash
+# 升级到最新版本
+redmine upgrade
+
+# 检查是否有新版本
+redmine upgrade --check
+
+# 升级到指定版本
+redmine upgrade --version v1.2.3
+```
 
 ## 快速开始
 
@@ -360,6 +376,19 @@ redmine status list
 
 # 列出优先级
 redmine priority list
+```
+
+### Upgrade
+
+```bash
+# 升级到最新版本
+redmine upgrade
+
+# 检查是否有新版本
+redmine upgrade --check
+
+# 升级到指定版本
+redmine upgrade --version v1.2.3
 ```
 
 ## 完整命令参考

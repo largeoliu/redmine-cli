@@ -86,6 +86,7 @@ func NewRootCommand(ctx context.Context) *cobra.Command {
 		newLoginCommand(flags),
 		newLogoutCommand(flags),
 		newVersionCommand(),
+		newUpgradeCommand(),
 		newConfigCommand(flags),
 		agile.NewCommand(flags, defaultResolver),
 		sprints.NewCommand(flags, defaultResolver),

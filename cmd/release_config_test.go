@@ -39,8 +39,8 @@ func TestGoReleaserConfigUsesSupportedReleaseTargets(t *testing.T) {
 		t.Fatal("expected npm publishing to be moved out of GoReleaser")
 	}
 
-	if _, exists := config["brews"]; !exists {
-		t.Fatal("expected Homebrew section in .goreleaser.yml")
+	if _, exists := config["brews"]; exists {
+		t.Fatal("expected Homebrew section to be removed from .goreleaser.yml")
 	}
 
 	archives, ok := config["archives"].([]any)
@@ -136,6 +136,11 @@ func TestReleaseWorkflowMatchesConfiguredPublishTargets(t *testing.T) {
 	publishStep := findStepByUses(t, npmJob, "")
 	if _, exists := publishStep.Env["NODE_AUTH_TOKEN"]; !exists {
 		t.Fatal("expected npm publish step to use NODE_AUTH_TOKEN")
+	}
+
+	publishRun := findStepByName(t, npmJob, "Publish to npm")
+	if !strings.Contains(publishRun.Run, "--ignore-scripts") {
+		t.Fatalf("expected npm publish step to ignore lifecycle scripts, got %q", publishRun.Run)
 	}
 }
 
