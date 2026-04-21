@@ -4,6 +4,7 @@
 
 - [全局参数](#全局参数)
 - [认证](#认证)
+- [Upgrade](#upgrade)
 - [配置](#配置)
 - [Agile](#agile)
 - [Sprint](#sprint)
@@ -54,6 +55,38 @@ redmine login
 ```
 
 交互式提示输入 URL 和 API key，并保存到配置文件。
+
+---
+
+## Upgrade
+
+### upgrade
+
+升级 redmine CLI 到最新版本。
+
+```bash
+redmine upgrade
+```
+
+**示例：**
+
+```bash
+# 升级到最新版本
+redmine upgrade
+
+# 仅检查更新，不执行升级
+redmine upgrade --check
+
+# 升级到指定版本
+redmine upgrade --version v1.2.3
+```
+
+**参数：**
+
+| 参数 | 简写 | 默认值 | 说明 |
+|------|------|--------|------|
+| `--check` | | `false` | 仅检查更新，不执行升级 |
+| `--version` | | | 升级到指定版本 |
 
 ---
 

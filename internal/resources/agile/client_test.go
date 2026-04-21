@@ -144,9 +144,9 @@ func TestClient_GetIssueAgileData(t *testing.T) {
 	defer mock.Close()
 
 	response := struct {
-		AgileData AgileData `json:"agile_data"`
+		AgileData Data `json:"agile_data"`
 	}{
-		AgileData: AgileData{
+		AgileData: Data{
 			AgileSprintID: intPtr(7),
 			StoryPoints:   5,
 			Position:      12,

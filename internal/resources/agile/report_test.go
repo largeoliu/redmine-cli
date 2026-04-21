@@ -95,20 +95,20 @@ func TestBuildBoardReport(t *testing.T) {
 		Offset:     0,
 	})
 	mock.HandleJSON("/issues/101/agile_data.json", struct {
-		AgileData AgileData `json:"agile_data"`
-	}{AgileData: AgileData{AgileSprintID: intPtr(7), StoryPoints: 3, Position: 4}})
+		AgileData Data `json:"agile_data"`
+	}{AgileData: Data{AgileSprintID: intPtr(7), StoryPoints: 3, Position: 4}})
 	mock.HandleJSON("/issues/102/agile_data.json", struct {
-		AgileData AgileData `json:"agile_data"`
-	}{AgileData: AgileData{AgileSprintID: intPtr(7), StoryPoints: 5, Position: 1}})
+		AgileData Data `json:"agile_data"`
+	}{AgileData: Data{AgileSprintID: intPtr(7), StoryPoints: 5, Position: 1}})
 	mock.HandleJSON("/issues/103/agile_data.json", struct {
-		AgileData AgileData `json:"agile_data"`
-	}{AgileData: AgileData{AgileSprintID: intPtr(7), StoryPoints: 8, Position: 9}})
+		AgileData Data `json:"agile_data"`
+	}{AgileData: Data{AgileSprintID: intPtr(7), StoryPoints: 8, Position: 9}})
 	mock.HandleJSON("/issues/104/agile_data.json", struct {
-		AgileData AgileData `json:"agile_data"`
-	}{AgileData: AgileData{StoryPoints: 2, Position: 2}})
+		AgileData Data `json:"agile_data"`
+	}{AgileData: Data{StoryPoints: 2, Position: 2}})
 	mock.HandleJSON("/issues/105/agile_data.json", struct {
-		AgileData AgileData `json:"agile_data"`
-	}{AgileData: AgileData{AgileSprintID: intPtr(8), StoryPoints: 1, Position: 1}})
+		AgileData Data `json:"agile_data"`
+	}{AgileData: Data{AgileSprintID: intPtr(8), StoryPoints: 1, Position: 1}})
 
 	c := client.NewClient(mock.URL, "test-key")
 	project := &projects.Project{ID: 42, Name: "City", Identifier: "city"}
@@ -192,11 +192,11 @@ func TestBuildBoardReportSelectedSprint(t *testing.T) {
 		Offset:     0,
 	})
 	mock.HandleJSON("/issues/101/agile_data.json", struct {
-		AgileData AgileData `json:"agile_data"`
-	}{AgileData: AgileData{AgileSprintID: intPtr(7), StoryPoints: 3, Position: 4}})
+		AgileData Data `json:"agile_data"`
+	}{AgileData: Data{AgileSprintID: intPtr(7), StoryPoints: 3, Position: 4}})
 	mock.HandleJSON("/issues/105/agile_data.json", struct {
-		AgileData AgileData `json:"agile_data"`
-	}{AgileData: AgileData{AgileSprintID: intPtr(8), StoryPoints: 1, Position: 1}})
+		AgileData Data `json:"agile_data"`
+	}{AgileData: Data{AgileSprintID: intPtr(8), StoryPoints: 1, Position: 1}})
 
 	c := client.NewClient(mock.URL, "test-key")
 	project := &projects.Project{ID: 42, Name: "City", Identifier: "city"}

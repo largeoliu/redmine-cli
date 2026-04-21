@@ -238,9 +238,9 @@ func newListCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Co
 				case trackerSelector == "", strings.EqualFold(trackerSelector, "全部"), strings.EqualFold(trackerSelector, "all"):
 					listFlags.TrackerID = 0
 				default:
-					trackerDef, err := trackers.NewClient(c).FindByName(cmd.Context(), trackerSelector)
-					if err != nil {
-						return err
+					trackerDef, trackerErr := trackers.NewClient(c).FindByName(cmd.Context(), trackerSelector)
+					if trackerErr != nil {
+						return trackerErr
 					}
 					listFlags.TrackerID = trackerDef.ID
 				}

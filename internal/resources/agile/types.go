@@ -22,8 +22,8 @@ type SprintList struct {
 	Offset       int      `json:"offset,omitempty"`
 }
 
-// AgileData represents agile metadata for an issue.
-type AgileData struct {
+// Data represents agile metadata for an issue.
+type Data struct {
 	AgileSprintID *int    `json:"agile_sprint_id,omitempty"`
 	StoryPoints   float64 `json:"story_points,omitempty"`
 	Position      int     `json:"position,omitempty"`

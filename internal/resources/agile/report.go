@@ -217,24 +217,24 @@ func collectIssues(ctx context.Context, c *issuespkg.Client, projectID int, trac
 	return client.CollectAll(client.Paginate(ctx, fetcher, 100))
 }
 
-func loadIssueAgileData(ctx context.Context, c *Client, allIssues []issuespkg.Issue) (map[int]AgileData, error) {
+func loadIssueAgileData(ctx context.Context, c *Client, allIssues []issuespkg.Issue) (map[int]Data, error) {
 	issueIDs := make([]int, 0, len(allIssues))
 	for _, issue := range allIssues {
 		issueIDs = append(issueIDs, issue.ID)
 	}
 	if len(issueIDs) == 0 {
-		return map[int]AgileData{}, nil
+		return map[int]Data{}, nil
 	}
 
-	results := client.BatchGetFunc(issueIDs, ctx, func(innerCtx context.Context, _ int, issueID int) (AgileData, error) {
+	results := client.BatchGetFunc(issueIDs, ctx, func(innerCtx context.Context, _ int, issueID int) (Data, error) {
 		data, err := c.GetIssueAgileData(innerCtx, issueID)
 		if err != nil {
-			return AgileData{}, err
+			return Data{}, err
 		}
 		return *data, nil
 	}, 5)
 
-	agileDataByIssueID := make(map[int]AgileData, len(results))
+	agileDataByIssueID := make(map[int]Data, len(results))
 	for _, result := range results {
 		if result.Error != nil {
 			return nil, result.Error
@@ -245,7 +245,7 @@ func loadIssueAgileData(ctx context.Context, c *Client, allIssues []issuespkg.Is
 	return agileDataByIssueID, nil
 }
 
-func buildBoardCard(issue issuespkg.Issue, data AgileData, statusPositions map[int]int, currentSprint *Sprint) BoardCard {
+func buildBoardCard(issue issuespkg.Issue, data Data, statusPositions map[int]int, currentSprint *Sprint) BoardCard {
 	card := BoardCard{
 		ID:          issue.ID,
 		Subject:     issue.Subject,

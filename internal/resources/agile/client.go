@@ -38,9 +38,9 @@ func (c *Client) GetSprint(ctx context.Context, projectID, sprintID int) (*Sprin
 }
 
 // GetIssueAgileData retrieves agile metadata for an issue.
-func (c *Client) GetIssueAgileData(ctx context.Context, issueID int) (*AgileData, error) {
+func (c *Client) GetIssueAgileData(ctx context.Context, issueID int) (*Data, error) {
 	var result struct {
-		AgileData AgileData `json:"agile_data"`
+		AgileData Data `json:"agile_data"`
 	}
 	if err := c.client.Get(ctx, fmt.Sprintf("/issues/%d/agile_data.json", issueID), &result); err != nil {
 		return nil, err

@@ -61,3 +61,13 @@ redmine config list
 # 显示当前配置
 redmine config get
 ```
+
+### 升级
+
+```bash
+# 升级到最新版本
+redmine upgrade
+
+# 检查是否有新版本
+redmine upgrade --check
+```

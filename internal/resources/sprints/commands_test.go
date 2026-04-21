@@ -168,32 +168,6 @@ func newSprintDetailsClient(t *testing.T) *client.Client {
 	}))
 }
 
-func newSprintDetailsErrorClient(t *testing.T) *client.Client {
-	t.Helper()
-	return client.NewClient("https://example.com", "test-key", client.WithHTTPClient(&http.Client{
-		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
-			switch req.URL.Path {
-			case "/projects/42.json":
-				return jsonHTTPResponse(t, http.StatusOK, map[string]any{
-					"project": projects.Project{ID: 42, Name: "City", Identifier: "city"},
-				}), nil
-			case "/projects/42/agile_sprints.json":
-				return jsonHTTPResponse(t, http.StatusOK, map[string]any{
-					"project_id":   42,
-					"project_name": "City",
-					"sprints": []map[string]any{
-						{"id": 7, "name": "Sprint 7", "status": "active", "description": "Release hardening"},
-						{"id": 8, "name": "Sprint 8", "status": "open", "description": "Stabilization"},
-					},
-				}), nil
-			default:
-				t.Fatalf("unexpected path: %s", req.URL.Path)
-				return nil, nil
-			}
-		}),
-	}))
-}
-
 func TestListCommand_DetailsExpandsSprintPayload(t *testing.T) {
 	flags := &types.GlobalFlags{Format: "json"}
 	var payload any

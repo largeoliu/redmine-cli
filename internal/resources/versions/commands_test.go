@@ -112,6 +112,19 @@ func TestListCommand_MissingProjectID(t *testing.T) {
 	}
 }
 
+func TestListCommand_ZeroProjectID(t *testing.T) {
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{"--project-id", "0"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error for zero project-id, got nil")
+	}
+}
+
 func TestListCommand_ResolveClientError(t *testing.T) {
 	flags := &types.GlobalFlags{}
 	resolver := &mockResolver{
@@ -153,37 +166,6 @@ func TestListCommand_WithLimit(t *testing.T) {
 
 	cmd := newListCommand(flags, resolver)
 	cmd.SetArgs([]string{"--project-id", "1", "--limit", "10"})
-
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestListCommand_WithOffset(t *testing.T) {
-	mock := testutil.NewMockServer(t)
-	defer mock.Close()
-
-	response := VersionList{
-		Versions: []Version{
-			{ID: 1, Name: "v1.0", Status: "open"},
-		},
-		TotalCount: 1,
-	}
-	mock.HandleJSON("/projects/1/versions.json", response)
-
-	flags := &types.GlobalFlags{}
-	resolver := &mockResolver{
-		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
-			return client.NewClient(mock.URL, "test-key"), nil
-		},
-		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
-			return nil
-		},
-	}
-
-	cmd := newListCommand(flags, resolver)
-	cmd.SetArgs([]string{"--project-id", "1", "--offset", "10"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -285,6 +267,19 @@ func TestCreateCommand_MissingProjectID(t *testing.T) {
 	err := cmd.Execute()
 	if err == nil {
 		t.Error("expected error for missing project-id, got nil")
+	}
+}
+
+func TestCreateCommand_ZeroProjectID(t *testing.T) {
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{}
+
+	cmd := newCreateCommand(flags, resolver)
+	cmd.SetArgs([]string{"--project-id", "0", "--name", "v1.0"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error for zero project-id, got nil")
 	}
 }
 

@@ -346,16 +346,16 @@ func setupBoardMock(t *testing.T) *testutil.MockServer {
 		Offset:     0,
 	})
 	mock.HandleJSON("/issues/101/agile_data.json", map[string]any{
-		"agile_data": AgileData{AgileSprintID: intPtr(7), StoryPoints: 5, Position: 2},
+		"agile_data": Data{AgileSprintID: intPtr(7), StoryPoints: 5, Position: 2},
 	})
 	mock.HandleJSON("/issues/102/agile_data.json", map[string]any{
-		"agile_data": AgileData{AgileSprintID: intPtr(7), StoryPoints: 1, Position: 1},
+		"agile_data": Data{AgileSprintID: intPtr(7), StoryPoints: 1, Position: 1},
 	})
 	mock.HandleJSON("/issues/103/agile_data.json", map[string]any{
-		"agile_data": AgileData{StoryPoints: 1, Position: 3},
+		"agile_data": Data{StoryPoints: 1, Position: 3},
 	})
 	mock.HandleJSON("/issues/104/agile_data.json", map[string]any{
-		"agile_data": AgileData{AgileSprintID: intPtr(8), StoryPoints: 8, Position: 1},
+		"agile_data": Data{AgileSprintID: intPtr(8), StoryPoints: 8, Position: 1},
 	})
 
 	return mock
@@ -427,13 +427,13 @@ func setupBoardTrackerMock(t *testing.T) *testutil.MockServer {
 		})
 	})
 	mock.HandleJSON("/issues/101/agile_data.json", map[string]any{
-		"agile_data": AgileData{AgileSprintID: intPtr(7), StoryPoints: 5, Position: 2},
+		"agile_data": Data{AgileSprintID: intPtr(7), StoryPoints: 5, Position: 2},
 	})
 	mock.HandleJSON("/issues/103/agile_data.json", map[string]any{
-		"agile_data": AgileData{StoryPoints: 1, Position: 3},
+		"agile_data": Data{StoryPoints: 1, Position: 3},
 	})
 	mock.HandleJSON("/issues/104/agile_data.json", map[string]any{
-		"agile_data": AgileData{AgileSprintID: intPtr(8), StoryPoints: 8, Position: 1},
+		"agile_data": Data{AgileSprintID: intPtr(8), StoryPoints: 8, Position: 1},
 	})
 
 	return mock

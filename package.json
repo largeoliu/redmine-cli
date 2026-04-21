@@ -8,7 +8,7 @@
   },
   "scripts": {
     "postinstall": "node scripts/download.js",
-    "prepare": "husky",
+    "prepare": "if [ -x node_modules/.bin/husky ]; then husky; fi",
     "lint:commit": "commitlint --from=HEAD~1 --to=HEAD"
   },
   "repository": {
