@@ -4,12 +4,14 @@ package issues
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"os"
 	"testing"
 
 	"github.com/largeoliu/redmine-cli/internal/client"
+	"github.com/largeoliu/redmine-cli/internal/resources/trackers"
 	"github.com/largeoliu/redmine-cli/internal/testutil"
 	"github.com/largeoliu/redmine-cli/internal/types"
 )
@@ -95,6 +97,72 @@ func TestListCommand_Success(t *testing.T) {
 
 	err := cmd.Execute()
 	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestListCommand_TrackerNameFilter(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleJSON("/trackers.json", trackers.TrackerList{
+		Trackers: []trackers.Tracker{
+			{ID: 1, Name: "需求"},
+			{ID: 2, Name: "缺陷"},
+		},
+	})
+	mock.Handle("/issues.json", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("tracker_id") != "1" {
+			t.Fatalf("expected tracker_id=1, got %s", r.URL.RawQuery)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(sampleIssueList())
+	})
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return nil
+		},
+	}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{"--tracker", "需求"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestListCommand_TrackerAllSkipsLookup(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.Handle("/issues.json", func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Query().Get("tracker_id"); got != "" {
+			t.Fatalf("expected no tracker_id, got %s", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(sampleIssueList())
+	})
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return nil
+		},
+	}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{"--tracker", "全部"})
+
+	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

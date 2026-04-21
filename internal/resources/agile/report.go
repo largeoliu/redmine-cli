@@ -10,12 +10,19 @@ import (
 	"time"
 
 	"github.com/largeoliu/redmine-cli/internal/client"
+	"github.com/largeoliu/redmine-cli/internal/errors"
 	issuespkg "github.com/largeoliu/redmine-cli/internal/resources/issues"
 	projectspkg "github.com/largeoliu/redmine-cli/internal/resources/projects"
 	statusespkg "github.com/largeoliu/redmine-cli/internal/resources/statuses"
+	"github.com/largeoliu/redmine-cli/internal/resources/trackers"
 )
 
-// BoardReport is the structured representation of an agile content view.
+type boardOptions struct {
+	Sprint  string
+	Tracker string
+}
+
+// BoardReport is the structured representation of an agile sprint view.
 type BoardReport struct {
 	Project       *projectspkg.Project `json:"project"`
 	CurrentSprint *Sprint              `json:"current_sprint,omitempty"`
@@ -23,7 +30,7 @@ type BoardReport struct {
 	Cards         []BoardCard          `json:"cards"`
 }
 
-// BoardGroup represents a sprint or no-sprint grouping.
+// BoardGroup represents a sprint grouping.
 type BoardGroup struct {
 	Name   string      `json:"name"`
 	Sprint *Sprint     `json:"sprint,omitempty"`
@@ -46,22 +53,31 @@ type BoardCard struct {
 }
 
 func buildBoardReport(ctx context.Context, c *client.Client, project *projectspkg.Project) (*BoardReport, []BoardCard, error) {
+	return buildBoardReportWithOptions(ctx, c, project, boardOptions{
+		Sprint:  "current",
+		Tracker: "全部",
+	})
+}
+
+func buildBoardReportWithOptions(ctx context.Context, c *client.Client, project *projectspkg.Project, opts boardOptions) (*BoardReport, []BoardCard, error) {
 	agileClient := NewClient(c)
 	issuesClient := issuespkg.NewClient(c)
 	statusClient := statusespkg.NewClient(c)
+	trackerClient := trackers.NewClient(c)
 
 	sprintList, err := agileClient.ListSprints(ctx, project.ID)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	currentSprint := selectCurrentSprint(sprintList.AgileSprints)
-	if currentSprint != nil {
-		detailed, err := agileClient.GetSprint(ctx, project.ID, currentSprint.ID)
-		if err != nil {
-			return nil, nil, err
-		}
-		currentSprint = detailed
+	selectedSprint, err := resolveSelectedSprint(ctx, agileClient, project.ID, sprintList.AgileSprints, opts.Sprint)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	trackerID, err := resolveTrackerFilter(ctx, trackerClient, opts.Tracker)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	statusPositions, err := loadStatusPositions(ctx, statusClient)
@@ -69,7 +85,7 @@ func buildBoardReport(ctx context.Context, c *client.Client, project *projectspk
 		return nil, nil, err
 	}
 
-	allIssues, err := collectIssues(ctx, issuesClient, project.ID)
+	allIssues, err := collectIssues(ctx, issuesClient, project.ID, trackerID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -81,38 +97,92 @@ func buildBoardReport(ctx context.Context, c *client.Client, project *projectspk
 
 	report := &BoardReport{
 		Project:       project,
-		CurrentSprint: currentSprint,
+		CurrentSprint: selectedSprint,
 	}
 
-	var currentGroup *BoardGroup
-	if currentSprint != nil {
-		currentGroup = &BoardGroup{Name: currentSprint.Name, Sprint: currentSprint}
-	}
-	noSprintGroup := BoardGroup{Name: "No Sprint"}
+	group := BoardGroup{Name: selectedSprint.Name, Sprint: selectedSprint}
 
 	for _, issue := range allIssues {
 		data := agileDataByIssueID[issue.ID]
-		card := buildBoardCard(issue, data, statusPositions, currentSprint)
-
-		switch {
-		case currentSprint != nil && card.SprintID == currentSprint.ID:
-			if currentGroup != nil {
-				currentGroup.Cards = append(currentGroup.Cards, card)
-			}
-		case card.SprintID == 0:
-			noSprintGroup.Cards = append(noSprintGroup.Cards, card)
+		card := buildBoardCard(issue, data, statusPositions, selectedSprint)
+		if card.SprintID == selectedSprint.ID {
+			group.Cards = append(group.Cards, card)
 		}
 	}
 
-	if currentGroup != nil {
-		sortBoardCards(currentGroup.Cards)
-		report.Groups = append(report.Groups, *currentGroup)
-	}
-	sortBoardCards(noSprintGroup.Cards)
-	report.Groups = append(report.Groups, noSprintGroup)
+	sortBoardCards(group.Cards)
+	report.Groups = append(report.Groups, group)
 
 	report.Cards = flattenCards(report.Groups)
 	return report, report.Cards, nil
+}
+
+func resolveSelectedSprint(ctx context.Context, c *Client, projectID int, sprints []Sprint, selector string) (*Sprint, error) {
+	selector = strings.TrimSpace(selector)
+	if selector == "" || strings.EqualFold(selector, "current") {
+		sprint := selectCurrentSprint(sprints)
+		if sprint == nil {
+			return nil, errors.NewValidation(
+				"current sprint not found",
+				errors.WithHint("Use --sprint <id> to view a specific sprint."),
+			)
+		}
+		detailed, err := c.GetSprint(ctx, projectID, sprint.ID)
+		if err != nil {
+			return nil, wrapSprintLookupError(strconv.Itoa(sprint.ID), err)
+		}
+		return detailed, nil
+	}
+
+	sprintID, err := strconv.Atoi(selector)
+	if err != nil || sprintID <= 0 {
+		return nil, errors.NewValidation(
+			"invalid sprint selector: "+selector,
+			errors.WithHint("Use --sprint current or --sprint <sprint-id>."),
+		)
+	}
+
+	detailed, err := c.GetSprint(ctx, projectID, sprintID)
+	if err != nil {
+		return nil, wrapSprintLookupError(selector, err)
+	}
+	return detailed, nil
+}
+
+func resolveTrackerFilter(ctx context.Context, c *trackers.Client, selector string) (int, error) {
+	selector = strings.TrimSpace(selector)
+	if selector == "" || strings.EqualFold(selector, "全部") || strings.EqualFold(selector, "all") {
+		return 0, nil
+	}
+
+	if trackerID, err := strconv.Atoi(selector); err == nil {
+		if trackerID <= 0 {
+			return 0, errors.NewValidation(
+				"invalid tracker selector: "+selector,
+				errors.WithHint("Use a tracker name or tracker ID."),
+			)
+		}
+		return trackerID, nil
+	}
+
+	tracker, err := c.FindByName(ctx, selector)
+	if err != nil {
+		return 0, err
+	}
+	return tracker.ID, nil
+}
+
+func wrapSprintLookupError(value string, err error) error {
+	if !isNotFoundError(err) {
+		return err
+	}
+
+	return errors.NewValidation(
+		"sprint not found: "+value,
+		errors.WithHint("Use a sprint ID from the project's agile sprint list."),
+		errors.WithActions("redmine agile board <project> --sprint current"),
+		errors.WithCause(err),
+	)
 }
 
 func loadStatusPositions(ctx context.Context, c *statusespkg.Client) (map[int]int, error) {
@@ -127,13 +197,16 @@ func loadStatusPositions(ctx context.Context, c *statusespkg.Client) (map[int]in
 	return positions, nil
 }
 
-func collectIssues(ctx context.Context, c *issuespkg.Client, projectID int) ([]issuespkg.Issue, error) {
+func collectIssues(ctx context.Context, c *issuespkg.Client, projectID int, trackerID int) ([]issuespkg.Issue, error) {
 	fetcher := func(innerCtx context.Context, offset, limit int) ([]issuespkg.Issue, int, error) {
 		params := map[string]string{
 			"project_id": strconv.Itoa(projectID),
 			"status_id":  "*",
 			"limit":      strconv.Itoa(limit),
 			"offset":     strconv.Itoa(offset),
+		}
+		if trackerID > 0 {
+			params["tracker_id"] = strconv.Itoa(trackerID)
 		}
 		result, err := c.List(innerCtx, params)
 		if err != nil {
@@ -267,7 +340,7 @@ func renderBoardReport(report *BoardReport) string {
 		fmt.Fprintf(&b, "Project: %s (%s)\n", report.Project.Name, report.Project.Identifier)
 	}
 	if report.CurrentSprint != nil {
-		fmt.Fprintf(&b, "Current sprint: %s", report.CurrentSprint.Name)
+		fmt.Fprintf(&b, "Sprint: %s", report.CurrentSprint.Name)
 		if report.CurrentSprint.StartDate != "" || report.CurrentSprint.EndDate != "" {
 			fmt.Fprintf(&b, " [%s - %s]", renderSprintDate(report.CurrentSprint.StartDate), renderSprintDate(report.CurrentSprint.EndDate))
 		}

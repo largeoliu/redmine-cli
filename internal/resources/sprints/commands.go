@@ -1,8 +1,7 @@
-package agile
+package sprints
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -10,26 +9,26 @@ import (
 
 	"github.com/largeoliu/redmine-cli/internal/client"
 	"github.com/largeoliu/redmine-cli/internal/errors"
-	"github.com/largeoliu/redmine-cli/internal/resources/projects"
+	agilepkg "github.com/largeoliu/redmine-cli/internal/resources/agile"
+	projectspkg "github.com/largeoliu/redmine-cli/internal/resources/projects"
 	"github.com/largeoliu/redmine-cli/internal/types"
 )
 
-// NewCommand creates a new agile command with content-oriented subcommands.
+// NewCommand creates a new sprint command.
 func NewCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "agile",
-		Short: "View Redmine agile content",
+		Use:     "sprint",
+		Short:   "View Redmine sprints",
+		Aliases: []string{"sprints"},
 	}
-	cmd.AddCommand(newBoardCommand(flags, resolver))
+	cmd.AddCommand(newListCommand(flags, resolver))
 	return cmd
 }
 
-func newBoardCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Command {
-	sprintSelector := "current"
-	trackerSelector := "全部"
+func newListCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "board <project>",
-		Short: "Show sprint content for a project",
+		Use:   "list <project>",
+		Short: "List project sprints",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := resolver.ResolveClient(flags)
@@ -42,32 +41,19 @@ func newBoardCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.C
 				return err
 			}
 
-			report, cards, err := buildBoardReportWithOptions(cmd.Context(), c, project, boardOptions{
-				Sprint:  sprintSelector,
-				Tracker: trackerSelector,
-			})
+			result, err := agilepkg.NewClient(c).ListSprints(cmd.Context(), project.ID)
 			if err != nil {
 				return err
 			}
 
-			switch strings.ToLower(flags.Format) {
-			case "", "json":
-				return resolver.WriteOutput(cmd.OutOrStdout(), flags, report)
-			case "table":
-				return resolver.WriteOutput(cmd.OutOrStdout(), flags, cards)
-			default:
-				_, err := fmt.Fprint(cmd.OutOrStdout(), renderBoardReport(report))
-				return err
-			}
+			return resolver.WriteOutput(cmd.OutOrStdout(), flags, result.AgileSprints)
 		},
 	}
-	cmd.Flags().StringVar(&sprintSelector, "sprint", "current", "Sprint selector: current or a sprint ID")
-	cmd.Flags().StringVar(&trackerSelector, "tracker", "全部", "Filter by tracker name (use 全部 to show all trackers)")
 	return cmd
 }
 
-func resolveProject(ctx context.Context, c *client.Client, value string) (*projects.Project, error) {
-	projectClient := projects.NewClient(c)
+func resolveProject(ctx context.Context, c *client.Client, value string) (*projectspkg.Project, error) {
+	projectClient := projectspkg.NewClient(c)
 
 	if id, err := strconv.Atoi(value); err == nil {
 		project, err := projectClient.Get(ctx, id, nil)

@@ -21,6 +21,7 @@ import (
 	"github.com/largeoliu/redmine-cli/internal/resources/issues"
 	"github.com/largeoliu/redmine-cli/internal/resources/priorities"
 	"github.com/largeoliu/redmine-cli/internal/resources/projects"
+	"github.com/largeoliu/redmine-cli/internal/resources/sprints"
 	"github.com/largeoliu/redmine-cli/internal/resources/statuses"
 	"github.com/largeoliu/redmine-cli/internal/resources/time_entries"
 	"github.com/largeoliu/redmine-cli/internal/resources/trackers"
@@ -87,6 +88,7 @@ func NewRootCommand(ctx context.Context) *cobra.Command {
 		newVersionCommand(),
 		newConfigCommand(flags),
 		agile.NewCommand(flags, defaultResolver),
+		sprints.NewCommand(flags, defaultResolver),
 		categories.NewCommand(flags, defaultResolver),
 		issues.NewCommand(flags, defaultResolver),
 		priorities.NewCommand(flags, defaultResolver),

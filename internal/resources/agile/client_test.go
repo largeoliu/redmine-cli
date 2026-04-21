@@ -1,7 +1,10 @@
 package agile
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"testing"
 
@@ -41,6 +44,58 @@ func TestClient_ListSprints(t *testing.T) {
 	}
 	if result.AgileSprints[0].Name != "Sprint 7" {
 		t.Fatalf("expected first sprint to be Sprint 7, got %s", result.AgileSprints[0].Name)
+	}
+}
+
+func TestClient_ListSprintsWithSprintsField(t *testing.T) {
+	c := client.NewClient("https://example.com", "test-key", client.WithHTTPClient(&http.Client{
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			if req.URL.Path != "/projects/42/agile_sprints.json" {
+				t.Fatalf("unexpected path: %s", req.URL.Path)
+			}
+			return jsonHTTPResponse(t, http.StatusOK, map[string]any{
+				"project_id":   42,
+				"project_name": "City",
+				"sprints": []map[string]any{
+					{"id": 7, "name": "Sprint 7", "status": "active"},
+					{"id": 8, "name": "Sprint 8", "status": "open"},
+				},
+			}), nil
+		}),
+	}))
+	agileClient := NewClient(c)
+
+	result, err := agileClient.ListSprints(context.Background(), 42)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.AgileSprints) != 2 {
+		t.Fatalf("expected 2 sprints, got %d", len(result.AgileSprints))
+	}
+	if result.AgileSprints[0].Name != "Sprint 7" {
+		t.Fatalf("expected first sprint to be Sprint 7, got %s", result.AgileSprints[0].Name)
+	}
+}
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func jsonHTTPResponse(t *testing.T, status int, payload any) *http.Response {
+	t.Helper()
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("failed to marshal response: %v", err)
+	}
+
+	return &http.Response{
+		StatusCode: status,
+		Status:     http.StatusText(status),
+		Header:     make(http.Header),
+		Body:       io.NopCloser(bytes.NewReader(data)),
 	}
 }
 

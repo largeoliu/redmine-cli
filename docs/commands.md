@@ -6,6 +6,7 @@
 - [认证](#认证)
 - [配置](#配置)
 - [Agile](#agile)
+- [Sprint](#sprint)
 - [Issues](#issues)
 - [Projects](#projects)
 - [Users](#users)
@@ -88,11 +89,38 @@ redmine config list
 
 ### agile board
 
-显示项目当前 Sprint 和 `No Sprint` 中的 issue 内容，适合快速查看迭代里有哪些卡片。
+显示项目当前 Sprint 或指定 Sprint 中的 issue 内容，支持按 tracker 过滤。
 
 ```bash
 redmine agile board city --format raw
-redmine agile board 42 --format table
+redmine agile board 42 --sprint 8 --tracker 需求 --format table
+```
+
+**参数：**
+
+| 参数 | 说明 |
+|------|------|
+| `<project>` | 项目 ID 或 identifier |
+| `--sprint` | `current` 或 sprint ID |
+| `--tracker` | tracker 名称，`全部` 表示不过滤 |
+
+**输出：**
+
+- `raw`：文本分组输出，按 Sprint 展示卡片内容
+- `table`：扁平表格输出，包含 Sprint 列
+- `json`：结构化报告，包含 `project`、`current_sprint`、`groups` 和 `cards`，其中 `current_sprint` 表示当前展示的 sprint
+
+---
+
+## Sprint
+
+### sprint list
+
+列出项目的 sprint 列表。
+
+```bash
+redmine sprint list city --format table
+redmine sprint list 42 --format json
 ```
 
 **参数：**
@@ -103,9 +131,9 @@ redmine agile board 42 --format table
 
 **输出：**
 
-- `raw`：文本分组输出，按 Sprint 展示卡片内容
-- `table`：扁平表格输出，包含 Sprint 列
-- `json`：结构化报告，包含 `project`、`current_sprint`、`groups` 和 `cards`
+- `json`：sprint 数组
+- `table`：展示 sprint 的全部字段
+- `raw`：单行 JSON
 
 ---
 
@@ -126,6 +154,7 @@ redmine issues list
 |------|------|
 | `--project-id` | 按项目 ID 筛选 |
 | `--status-id` | 按状态 ID 筛选 |
+| `--tracker` | 按追踪器名称筛选，`全部` 表示不过滤 |
 | `--tracker-id` | 按追踪器 ID 筛选 |
 | `--assigned-to-id` | 按 assignee ID 筛选 |
 | `--include` | 包含关联数据（children、attachments、relations、changesets、journals、watchers） |
@@ -141,6 +170,12 @@ redmine issue list --project-id 1
 
 # 按状态筛选
 redmine issue list --status-id 1
+
+# 按追踪器名称筛选
+redmine issue list --tracker 需求
+
+# 不筛选追踪器
+redmine issue list --tracker 全部
 
 # 包含关联数据
 redmine issue list --include relations,journals

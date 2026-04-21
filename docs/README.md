@@ -26,6 +26,10 @@ redmine issue get 123
 
 # 查看 agile 内容
 redmine agile board city --format raw
+redmine agile board city --sprint 8 --tracker 需求 --format raw
+
+# 查看 sprint 列表
+redmine sprint list city --format table
 ```
 
 ### 输出控制
