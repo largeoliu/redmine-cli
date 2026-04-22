@@ -448,6 +448,7 @@ func TestIssueListPagination(t *testing.T) {
 		"--key", "test-api-key",
 		"--limit", "10",
 		"--offset", "20",
+		"--project-id", "1",
 		"issues", "list",
 		"--project-id", "1",
 	)
@@ -485,8 +486,8 @@ func TestIssueListWithFilters(t *testing.T) {
 	_, _, exitCode := runCommand(
 		"--url", server.URL,
 		"--key", "test-api-key",
-		"issues", "list",
 		"--project-id", "1",
+		"issues", "list",
 		"--tracker-id", "2",
 		"--status-id", "3",
 	)
@@ -522,6 +523,7 @@ func TestIssueListAssignedTo(t *testing.T) {
 	stdout, _, exitCode := runCommand(
 		"--url", server.URL,
 		"--key", "test-api-key",
+		"--project-id", "1",
 		"issues", "list",
 		"--project-id", "1",
 		"--assigned-to-id", "5",
@@ -560,6 +562,7 @@ func TestIssueListSorting(t *testing.T) {
 	_, _, exitCode := runCommand(
 		"--url", server.URL,
 		"--key", "test-api-key",
+		"--project-id", "1",
 		"issues", "list",
 		"--project-id", "1",
 		"--sort", "created_on:desc",
@@ -1166,6 +1169,7 @@ func TestCustomQueryFilter(t *testing.T) {
 		"--url", server.URL,
 		"--key", "test-api-key",
 		"issues", "list",
+		"--project-id", "1",
 		"--query", "5",
 	)
 
