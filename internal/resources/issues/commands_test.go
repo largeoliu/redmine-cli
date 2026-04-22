@@ -93,7 +93,7 @@ func TestListCommand_Success(t *testing.T) {
 	}
 
 	cmd := newListCommand(flags, resolver)
-	cmd.SetArgs([]string{})
+	cmd.SetArgs([]string{"--project-id", "1"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -130,7 +130,7 @@ func TestListCommand_TrackerNameFilter(t *testing.T) {
 	}
 
 	cmd := newListCommand(flags, resolver)
-	cmd.SetArgs([]string{"--tracker", "需求"})
+	cmd.SetArgs([]string{"--project-id", "1", "--tracker", "需求"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -160,7 +160,7 @@ func TestListCommand_TrackerAllSkipsLookup(t *testing.T) {
 	}
 
 	cmd := newListCommand(flags, resolver)
-	cmd.SetArgs([]string{"--tracker", "全部"})
+	cmd.SetArgs([]string{"--project-id", "1", "--tracker", "全部"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -190,7 +190,7 @@ func TestListCommand_VersionIDFilter(t *testing.T) {
 	}
 
 	cmd := newListCommand(flags, resolver)
-	cmd.SetArgs([]string{"--version-id", "123"})
+	cmd.SetArgs([]string{"--project-id", "1", "--version-id", "123"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -206,7 +206,7 @@ func TestListCommand_ResolveClientError(t *testing.T) {
 	}
 
 	cmd := newListCommand(flags, resolver)
-	cmd.SetArgs([]string{})
+	cmd.SetArgs([]string{"--project-id", "1"})
 
 	err := cmd.Execute()
 	if err == nil {
@@ -583,7 +583,7 @@ func TestListCommand_APIError(t *testing.T) {
 	}
 
 	cmd := newListCommand(flags, resolver)
-	cmd.SetArgs([]string{})
+	cmd.SetArgs([]string{"--project-id", "1"})
 
 	err := cmd.Execute()
 	if err == nil {
@@ -612,7 +612,7 @@ func TestListCommand_WithGlobalLimit(t *testing.T) {
 	}
 
 	cmd := newListCommand(flags, resolver)
-	cmd.SetArgs([]string{})
+	cmd.SetArgs([]string{"--project-id", "1"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -641,7 +641,7 @@ func TestListCommand_WithGlobalOffset(t *testing.T) {
 	}
 
 	cmd := newListCommand(flags, resolver)
-	cmd.SetArgs([]string{})
+	cmd.SetArgs([]string{"--project-id", "1"})
 
 	err := cmd.Execute()
 	if err != nil {
