@@ -70,6 +70,7 @@ func (c *Client) Delete(ctx context.Context, id int) error {
 type ListFlags struct {
 	ProjectID    int
 	TrackerID    int
+	VersionID    int
 	StatusID     int
 	AssignedToID int
 	Limit        int
@@ -86,6 +87,9 @@ func BuildListParams(flags ListFlags) map[string]string {
 	}
 	if flags.TrackerID > 0 {
 		params["tracker_id"] = strconv.Itoa(flags.TrackerID)
+	}
+	if flags.VersionID > 0 {
+		params["fixed_version_id"] = strconv.Itoa(flags.VersionID)
 	}
 	if flags.StatusID > 0 {
 		params["status_id"] = strconv.Itoa(flags.StatusID)
