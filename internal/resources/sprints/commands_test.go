@@ -5,11 +5,9 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"strings"
 	"testing"
 
 	"github.com/largeoliu/redmine-cli/internal/client"
-	"github.com/largeoliu/redmine-cli/internal/output"
 	"github.com/largeoliu/redmine-cli/internal/resources/agile"
 	"github.com/largeoliu/redmine-cli/internal/resources/projects"
 	"github.com/largeoliu/redmine-cli/internal/types"
@@ -45,8 +43,15 @@ func TestNewCommand(t *testing.T) {
 	if len(cmd.Aliases) != 1 || cmd.Aliases[0] != "sprints" {
 		t.Fatalf("expected alias sprints, got %v", cmd.Aliases)
 	}
-	if len(cmd.Commands()) != 1 || cmd.Commands()[0].Name() != "list" {
-		t.Fatalf("expected list subcommand, got %v", cmd.Commands())
+	if len(cmd.Commands()) != 2 {
+		t.Fatalf("expected 2 subcommands, got %d", len(cmd.Commands()))
+	}
+	subcommandNames := make([]string, len(cmd.Commands()))
+	for i, c := range cmd.Commands() {
+		subcommandNames[i] = c.Name()
+	}
+	if subcommandNames[0] != "get" || subcommandNames[1] != "list" {
+		t.Fatalf("expected [get, list], got %v", subcommandNames)
 	}
 }
 
@@ -102,7 +107,7 @@ func TestListCommand_Success(t *testing.T) {
 	}
 
 	cmd := newListCommand(flags, resolver)
-	cmd.SetArgs([]string{"42"})
+	cmd.SetArgs([]string{"--project", "42"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -117,6 +122,84 @@ func TestListCommand_Success(t *testing.T) {
 	}
 	if sprints[0].ID != 7 || sprints[1].ID != 8 {
 		t.Fatalf("unexpected sprint ids: %+v", sprints)
+	}
+}
+
+func TestGetCommand_Success(t *testing.T) {
+	flags := &types.GlobalFlags{Format: "json"}
+	var payload any
+	c := client.NewClient("https://example.com", "test-key", client.WithHTTPClient(&http.Client{
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			switch req.URL.Path {
+			case "/projects/42/agile_sprints/7.json":
+				return jsonHTTPResponse(t, http.StatusOK, map[string]any{
+					"agile_sprint": map[string]any{
+						"id":              7,
+						"project_id":      42,
+						"name":            "Sprint 7",
+						"status":          "active",
+						"start_date":      "2026-04-01",
+						"end_date":        "2026-04-14",
+						"story_points":    68.0,
+						"done_ratio":      100.0,
+						"estimated_hours": 68.0,
+						"spent_hours":     186.5,
+					},
+				}), nil
+			default:
+				t.Fatalf("unexpected path: %s", req.URL.Path)
+				return nil, nil
+			}
+		}),
+	}))
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) { return c, nil },
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, p any) error {
+			payload = p
+			return nil
+		},
+	}
+
+	cmd := newGetCommand(flags, resolver)
+	cmd.SetArgs([]string{"--project-id", "42", "7"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	sprint, ok := payload.(*agile.Sprint)
+	if !ok {
+		t.Fatalf("expected *agile.Sprint payload, got %T", payload)
+	}
+	if sprint.ID != 7 {
+		t.Fatalf("expected sprint ID 7, got %d", sprint.ID)
+	}
+	if sprint.ProjectID != 42 {
+		t.Fatalf("expected project_id 42, got %d", sprint.ProjectID)
+	}
+	if sprint.StoryPoints != 68.0 {
+		t.Fatalf("expected story_points 68.0, got %f", sprint.StoryPoints)
+	}
+	if sprint.DoneRatio != 100.0 {
+		t.Fatalf("expected done_ratio 100.0, got %f", sprint.DoneRatio)
+	}
+	if sprint.SpentHours != 186.5 {
+		t.Fatalf("expected spent_hours 186.5, got %f", sprint.SpentHours)
+	}
+}
+
+func TestGetCommand_MissingProjectID(t *testing.T) {
+	flags := &types.GlobalFlags{Format: "json"}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) { return nil, nil },
+	}
+
+	cmd := newGetCommand(flags, resolver)
+	cmd.SetArgs([]string{"7"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when --project-id is missing")
 	}
 }
 
@@ -139,81 +222,5 @@ func jsonHTTPResponse(t *testing.T, status int, payload any) *http.Response {
 		Status:     http.StatusText(status),
 		Header:     make(http.Header),
 		Body:       io.NopCloser(bytes.NewReader(data)),
-	}
-}
-
-func newSprintDetailsClient(t *testing.T) *client.Client {
-	t.Helper()
-	return client.NewClient("https://example.com", "test-key", client.WithHTTPClient(&http.Client{
-		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
-			switch req.URL.Path {
-			case "/projects/42.json":
-				return jsonHTTPResponse(t, http.StatusOK, map[string]any{
-					"project": projects.Project{ID: 42, Name: "City", Identifier: "city"},
-				}), nil
-			case "/projects/42/agile_sprints.json":
-				return jsonHTTPResponse(t, http.StatusOK, map[string]any{
-					"project_id":   42,
-					"project_name": "City",
-					"sprints": []map[string]any{
-						{"id": 7, "name": "Sprint 7", "status": "active", "description": "Release hardening", "start_date": "2026-04-01", "end_date": "2026-04-14"},
-						{"id": 8, "name": "Sprint 8", "status": "open", "description": "Stabilization", "start_date": "2026-04-15", "end_date": "2026-04-28"},
-					},
-				}), nil
-			default:
-				t.Fatalf("unexpected path: %s", req.URL.Path)
-				return nil, nil
-			}
-		}),
-	}))
-}
-
-func TestListCommand_DetailsExpandsSprintPayload(t *testing.T) {
-	flags := &types.GlobalFlags{Format: "json"}
-	var payload any
-	c := newSprintDetailsClient(t)
-	resolver := &mockResolver{
-		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) { return c, nil },
-		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, p any) error {
-			payload = p
-			return nil
-		},
-	}
-
-	cmd := newListCommand(flags, resolver)
-	cmd.SetArgs([]string{"--details", "42"})
-
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	sprints, ok := payload.([]agile.Sprint)
-	if !ok {
-		t.Fatalf("expected []agile.Sprint payload, got %T", payload)
-	}
-	if sprints[0].Description != "Release hardening" {
-		t.Fatalf("expected expanded description, got %+v", sprints[0])
-	}
-}
-
-func TestListCommand_DetailsRendersTablePayload(t *testing.T) {
-	flags := &types.GlobalFlags{Format: "table"}
-	var rendered bytes.Buffer
-	c := newSprintDetailsClient(t)
-	resolver := &mockResolver{
-		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) { return c, nil },
-		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, p any) error {
-			return output.Write(&rendered, output.FormatTable, p)
-		},
-	}
-
-	cmd := newListCommand(flags, resolver)
-	cmd.SetArgs([]string{"--details", "42"})
-
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(rendered.String(), "Release hardening") {
-		t.Fatalf("expected table rendering to include the description, got:\n%s", rendered.String())
 	}
 }

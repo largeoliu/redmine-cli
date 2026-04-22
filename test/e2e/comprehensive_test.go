@@ -422,12 +422,16 @@ func TestIssueListPagination(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		limit := r.URL.Query().Get("limit")
 		offset := r.URL.Query().Get("offset")
+		projectID := r.URL.Query().Get("project_id")
 
 		if limit != "10" {
 			t.Errorf("Expected limit=10, got %s", limit)
 		}
 		if offset != "20" {
 			t.Errorf("Expected offset=20, got %s", offset)
+		}
+		if projectID != "1" {
+			t.Errorf("Expected project_id=1, got %s", projectID)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -444,7 +448,9 @@ func TestIssueListPagination(t *testing.T) {
 		"--key", "test-api-key",
 		"--limit", "10",
 		"--offset", "20",
+		"--project-id", "1",
 		"issues", "list",
+		"--project-id", "1",
 	)
 
 	if exitCode != 0 {
@@ -480,8 +486,8 @@ func TestIssueListWithFilters(t *testing.T) {
 	_, _, exitCode := runCommand(
 		"--url", server.URL,
 		"--key", "test-api-key",
-		"issues", "list",
 		"--project-id", "1",
+		"issues", "list",
 		"--tracker-id", "2",
 		"--status-id", "3",
 	)
@@ -494,9 +500,13 @@ func TestIssueListWithFilters(t *testing.T) {
 func TestIssueListAssignedTo(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assignedToID := r.URL.Query().Get("assigned_to_id")
+		projectID := r.URL.Query().Get("project_id")
 
 		if assignedToID != "5" {
 			t.Errorf("Expected assigned_to_id=5, got %s", assignedToID)
+		}
+		if projectID != "1" {
+			t.Errorf("Expected project_id=1, got %s", projectID)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -513,7 +523,9 @@ func TestIssueListAssignedTo(t *testing.T) {
 	stdout, _, exitCode := runCommand(
 		"--url", server.URL,
 		"--key", "test-api-key",
+		"--project-id", "1",
 		"issues", "list",
+		"--project-id", "1",
 		"--assigned-to-id", "5",
 	)
 
@@ -529,9 +541,13 @@ func TestIssueListAssignedTo(t *testing.T) {
 func TestIssueListSorting(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sort := r.URL.Query().Get("sort")
+		projectID := r.URL.Query().Get("project_id")
 
 		if sort != "created_on:desc" {
 			t.Errorf("Expected sort=created_on:desc, got %s", sort)
+		}
+		if projectID != "1" {
+			t.Errorf("Expected project_id=1, got %s", projectID)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -546,7 +562,9 @@ func TestIssueListSorting(t *testing.T) {
 	_, _, exitCode := runCommand(
 		"--url", server.URL,
 		"--key", "test-api-key",
+		"--project-id", "1",
 		"issues", "list",
+		"--project-id", "1",
 		"--sort", "created_on:desc",
 	)
 
@@ -1151,6 +1169,7 @@ func TestCustomQueryFilter(t *testing.T) {
 		"--url", server.URL,
 		"--key", "test-api-key",
 		"issues", "list",
+		"--project-id", "1",
 		"--query", "5",
 	)
 
