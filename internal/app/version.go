@@ -9,7 +9,7 @@ import (
 
 func newVersionCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:   "version",
+		Use:   "info",
 		Short: "Print version information",
 		Run: func(_ *cobra.Command, _ []string) {
 			fmt.Printf("redmine version %s\n", version)
