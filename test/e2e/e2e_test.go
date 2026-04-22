@@ -322,6 +322,7 @@ func TestIssuesListWithMockServer(t *testing.T) {
 	stdout, _, exitCode := runCommand(
 		"--url", server.URL,
 		"--key", "test-api-key",
+		"--project-id", "1",
 		"issues", "list",
 	)
 
@@ -596,6 +597,7 @@ func TestLimitFlag(t *testing.T) {
 		"--url", server.URL,
 		"--key", "test-api-key",
 		"--limit", "10",
+		"--project-id", "1",
 		"issues", "list",
 	)
 
@@ -617,6 +619,7 @@ func TestTimeoutFlag(t *testing.T) {
 		"--url", server.URL,
 		"--key", "test-api-key",
 		"--timeout", "1s",
+		"--project-id", "1",
 		"issues", "list",
 	)
 

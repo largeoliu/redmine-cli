@@ -221,6 +221,9 @@ func newListCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Co
 		Use:   "list",
 		Short: "List issues",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if listFlags.ProjectID == 0 {
+				return errors.NewValidation("--project-id is required")
+			}
 			// 使用全局标志的 limit 和 offset（如果设置了的话）
 			if flags.Limit > 0 {
 				listFlags.Limit = flags.Limit
@@ -256,6 +259,7 @@ func newListCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Co
 	cmd.Flags().IntVar(&listFlags.ProjectID, "project-id", 0, "Filter by project ID")
 	cmd.Flags().StringVar(&trackerSelector, "tracker", "", "Filter by tracker name (use 全部 to skip filtering)")
 	cmd.Flags().IntVar(&listFlags.TrackerID, "tracker-id", 0, "Filter by tracker ID")
+	cmd.Flags().IntVar(&listFlags.VersionID, "version-id", 0, "Filter by fixed version ID")
 	cmd.Flags().IntVar(&listFlags.StatusID, "status-id", 0, "Filter by status ID")
 	cmd.Flags().IntVar(&listFlags.AssignedToID, "assigned-to-id", 0, "Filter by assigned user ID")
 	cmd.Flags().StringVar(&listFlags.Query, "query", "", "Filter by custom query ID")
@@ -349,7 +353,7 @@ func newCreateCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.
 	cmd.Flags().IntVar(&req.PriorityID, "priority-id", 0, "Priority ID")
 	cmd.Flags().IntVar(&req.AssignedToID, "assigned-to-id", 0, "Assigned user ID")
 	cmd.Flags().IntVar(&req.CategoryID, "category-id", 0, "Category ID")
-	cmd.Flags().IntVar(&req.FixedVersionID, "fixed-version-id", 0, "Target version ID")
+	cmd.Flags().IntVar(&req.FixedVersionID, "version-id", 0, "Target version ID")
 	cmd.Flags().StringVar(&req.StartDate, "start-date", "", "Start date (YYYY-MM-DD)")
 	cmd.Flags().StringVar(&req.DueDate, "due-date", "", "Due date (YYYY-MM-DD)")
 	cmd.Flags().IntVar(&req.DoneRatio, "done-ratio", 0, "Done ratio (0-100)")
@@ -400,7 +404,7 @@ func newUpdateCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.
 	cmd.Flags().IntVar(&req.PriorityID, "priority-id", 0, "Priority ID")
 	cmd.Flags().IntVar(&req.AssignedToID, "assigned-to-id", 0, "Assigned user ID")
 	cmd.Flags().IntVar(&req.CategoryID, "category-id", 0, "Category ID")
-	cmd.Flags().IntVar(&req.FixedVersionID, "fixed-version-id", 0, "Target version ID")
+	cmd.Flags().IntVar(&req.FixedVersionID, "version-id", 0, "Target version ID")
 	cmd.Flags().StringVar(&req.StartDate, "start-date", "", "Start date (YYYY-MM-DD)")
 	cmd.Flags().StringVar(&req.DueDate, "due-date", "", "Due date (YYYY-MM-DD)")
 	cmd.Flags().IntVar(&req.DoneRatio, "done-ratio", 0, "Done ratio (0-100)")
