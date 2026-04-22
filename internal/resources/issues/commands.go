@@ -221,6 +221,9 @@ func newListCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Co
 		Use:   "list",
 		Short: "List issues",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if listFlags.ProjectID == 0 {
+				return errors.NewValidation("--project-id is required")
+			}
 			// 使用全局标志的 limit 和 offset（如果设置了的话）
 			if flags.Limit > 0 {
 				listFlags.Limit = flags.Limit
