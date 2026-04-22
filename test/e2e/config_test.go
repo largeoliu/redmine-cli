@@ -148,8 +148,8 @@ func TestComplexIssueFilters(t *testing.T) {
 	_, _, exitCode := runCommand(
 		"--url", server.URL,
 		"--key", "test-api-key",
-		"issues", "list",
 		"--project-id", "1",
+		"issues", "list",
 		"--tracker-id", "2",
 		"--status-id", "3",
 		"--assigned-to-id", "4",
@@ -180,6 +180,7 @@ func TestIssuesListWithQueryFilter(t *testing.T) {
 	_, _, exitCode := runCommand(
 		"--url", server.URL,
 		"--key", "test-api-key",
+		"--project-id", "1",
 		"issues", "list",
 		"--query", "7",
 	)
@@ -211,6 +212,7 @@ func TestIssuesListDoneRatio(t *testing.T) {
 	stdout, _, exitCode := runCommand(
 		"--url", server.URL,
 		"--key", "test-api-key",
+		"--project-id", "1",
 		"issues", "list",
 	)
 

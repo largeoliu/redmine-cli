@@ -17,7 +17,7 @@ func TestNewVersionCommand(t *testing.T) {
 		t.Fatal("expected version command, got nil")
 	}
 
-	if cmd.Use != "version" {
+	if cmd.Use != "info" {
 		t.Errorf("expected Use 'version', got %s", cmd.Use)
 	}
 
@@ -105,16 +105,16 @@ func TestVersionCommandWithRoot(t *testing.T) {
 	ctx := context.Background()
 	root := NewRootCommand(ctx)
 
-	versionCmd, _, err := root.Find([]string{"version"})
+	versionCmd, _, err := root.Find([]string{"info"})
 	if err != nil {
-		t.Fatalf("failed to find version command: %v", err)
+		t.Fatalf("failed to find info command: %v", err)
 	}
 
 	if versionCmd == nil {
-		t.Fatal("expected version command, got nil")
+		t.Fatal("expected info command, got nil")
 	}
 
-	if versionCmd.Name() != "version" {
+	if versionCmd.Name() != "info" {
 		t.Errorf("expected command name 'version', got %s", versionCmd.Name())
 	}
 }
@@ -137,8 +137,8 @@ func TestVersionCommandHelp(t *testing.T) {
 	}
 
 	// 验证帮助输出包含命令�?
-	if !strings.Contains(output, "version") {
-		t.Error("expected help to contain 'version'")
+	if !strings.Contains(output, "info") {
+		t.Error("expected help to contain 'info'")
 	}
 }
 
@@ -203,7 +203,7 @@ func TestVersionCommandIntegration(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	root.SetArgs([]string{"version"})
+	root.SetArgs([]string{"info"})
 
 	err := root.Execute()
 	if err != nil {
@@ -330,17 +330,17 @@ func TestVersionCommandRegistration(t *testing.T) {
 	// 获取所有子命令
 	commands := root.Commands()
 
-	// 查找 version 命令
+	// 查找 info 命令
 	var found bool
 	for _, cmd := range commands {
-		if cmd.Name() == "version" {
+		if cmd.Name() == "info" {
 			found = true
 			break
 		}
 	}
 
 	if !found {
-		t.Error("version command not registered with root command")
+		t.Error("info command not registered with root command")
 	}
 }
 
@@ -377,12 +377,12 @@ func TestVersionCommandSilenceMode(t *testing.T) {
 	ctx := context.Background()
 	root := NewRootCommand(ctx)
 
-	versionCmd, _, err := root.Find([]string{"version"})
+	versionCmd, _, err := root.Find([]string{"info"})
 	if err != nil {
-		t.Fatalf("failed to find version command: %v", err)
+		t.Fatalf("failed to find info command: %v", err)
 	}
 
-	// version 命令应该继承根命令的静默设置
+	// info 命令应该继承根命令的静默设置
 	// 或者有自己的静默设�?
 	// 这里只验证命令可以正常执�?
 
