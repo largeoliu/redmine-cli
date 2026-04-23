@@ -55,7 +55,7 @@ func resolveSprintID(ctx context.Context, c *client.Client, projectID int, selec
 
 	switch len(matches) {
 	case 0:
-		return 0, errors.NewValidation("sprint not found: "+selector)
+		return 0, errors.NewValidation("sprint not found: " + selector)
 	case 1:
 		return matches[0].ID, nil
 	default:
@@ -63,7 +63,7 @@ func resolveSprintID(ctx context.Context, c *client.Client, projectID int, selec
 		for _, s := range matches {
 			ids = append(ids, strconv.Itoa(s.ID))
 		}
-		return 0, errors.NewValidation("multiple sprints match name: "+selector+" (ids: "+strings.Join(ids, ",")+")")
+		return 0, errors.NewValidation("multiple sprints match name: " + selector + " (ids: " + strings.Join(ids, ",") + ")")
 	}
 }
 
