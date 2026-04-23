@@ -93,7 +93,10 @@ func newMockServer() *mockServer {
 func (m *mockServer) handleJSON(path string, response any) {
 	m.mux.HandleFunc(path, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			// Log but don't fail - this is test infrastructure
+			_, _ = w.Write([]byte(`{}`))
+		}
 	})
 }
 
@@ -102,9 +105,11 @@ func (m *mockServer) handleError(path string, statusCode int, message string) {
 	m.mux.HandleFunc(path, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(statusCode)
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
+		if err := json.NewEncoder(w).Encode(map[string]any{
 			"errors": []string{message},
-		})
+		}); err != nil {
+			_, _ = w.Write([]byte(`{}`))
+		}
 	})
 }
 

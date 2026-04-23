@@ -878,31 +878,42 @@ func TestDeleteCommand_ConfirmationWithYes(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	flags := &types.GlobalFlags{Yes: false}
-	resolver := &mockResolver{
-		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
-			return client.NewClient(mock.URL, "test-key"), nil
-		},
+	testCases := []struct {
+		name  string
+		input string
+	}{
+		{"lowercase y", "y\n"},
+		{"uppercase Y", "Y\n"},
 	}
 
-	// 模拟用户输入 'y'
-	input := "y\n"
-	r, w, _ := os.Pipe()
-	_, _ = w.WriteString(input)
-	w.Close()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			flags := &types.GlobalFlags{Yes: false}
+			resolver := &mockResolver{
+				resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+					return client.NewClient(mock.URL, "test-key"), nil
+				},
+			}
 
-	oldStdin := os.Stdin
-	defer func() { os.Stdin = oldStdin }()
-	os.Stdin = r
+			r, w, _ := os.Pipe()
+			_, _ = w.WriteString(tc.input)
+			w.Close()
 
-	cmd := newDeleteCommand(flags, resolver)
-	cmd.SetArgs([]string{"1"})
+			oldStdin := os.Stdin
+			defer func() { os.Stdin = oldStdin }()
+			os.Stdin = r
 
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+			cmd := newDeleteCommand(flags, resolver)
+			cmd.SetArgs([]string{"1"})
+
+			err := cmd.Execute()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+		}
 }
+
 
 func TestDeleteCommand_ConfirmationWithNo(t *testing.T) {
 	flags := &types.GlobalFlags{Yes: false}
