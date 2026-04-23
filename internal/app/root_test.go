@@ -57,7 +57,6 @@ func TestRootCommandHasSubcommands(t *testing.T) {
 		"version",
 		"config",
 		"sprint",
-		"agile",
 		"category",
 		"issue",
 		"priority",

@@ -36,7 +36,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.23'
+          go-version-file: go.mod
           cache: true
 
       - name: golangci-lint
@@ -56,16 +56,18 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.23'
+          go-version-file: go.mod
           cache: true
 
       - name: Verify dependencies
         run: |
+          export GOTOOLCHAIN=auto
           go mod verify
           go mod tidy -diff
 
       - name: Check code formatting
         run: |
+          export GOTOOLCHAIN=auto
           if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
             echo "The following files need formatting:"
             gofmt -s -l .
@@ -75,21 +77,20 @@ jobs:
 
       - name: Run tests with coverage
         run: |
+          export GOTOOLCHAIN=auto
           go test -v -race -coverprofile=coverage.out -covermode=atomic $(go list ./... | grep -v -e integration -e e2e)
           go tool cover -func=coverage.out
 
       - name: Check coverage threshold (90%)
         run: |
+          export GOTOOLCHAIN=auto
           THRESHOLD=90
-          # 创建临时覆盖率文件，排除无法测试的文件
           grep -v -e "cmd/main.go" -e "internal/testutil/leak.go" -e "internal/app/root.go" coverage.out > coverage_filtered.out 2>/dev/null || true
-          
-          # 计算过滤后的覆盖率
+
           if [ -s coverage_filtered.out ]; then
             go tool cover -func=coverage_filtered.out
             COVERAGE=$(go tool cover -func=coverage_filtered.out | grep total | awk '{print $3}' | sed 's/%//')
             echo "Total coverage (excluding ignored files): ${COVERAGE}%"
-            # 使用 awk 替代 bc 进行数值比较
             if awk "BEGIN {exit !($COVERAGE < $THRESHOLD)}"; then
               echo "Error: Coverage ${COVERAGE}% is below ${THRESHOLD}% threshold"
               exit 1
@@ -115,11 +116,12 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.23'
+          go-version-file: go.mod
           cache: true
 
       - name: Verify generated files are committed
         run: |
+          export GOTOOLCHAIN=auto
           go generate ./...
           git diff --exit-code
 
@@ -134,14 +136,18 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.23'
+          go-version-file: go.mod
           cache: true
 
       - name: Build binary
-        run: go build -o bin/redmine ./cmd
+        run: |
+          export GOTOOLCHAIN=auto
+          go build -o bin/redmine ./cmd
 
       - name: Run E2E tests
-        run: go test -v -count=1 ./test/e2e/...
+        run: |
+          export GOTOOLCHAIN=auto
+          go test -v -count=1 ./test/e2e/...
 
   fuzz:
     name: Fuzz Tests
@@ -153,17 +159,21 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.23'
+          go-version-file: go.mod
           cache: true
 
       - name: Run fuzz tests (client)
         id: fuzz-client
-        run: go test -fuzz=Fuzz -fuzztime=5m ./internal/client/...
+        run: |
+          export GOTOOLCHAIN=auto
+          go test -fuzz=Fuzz -fuzztime=5m ./internal/client/...
         continue-on-error: true
 
       - name: Run fuzz tests (output)
         id: fuzz-output
-        run: go test -fuzz=Fuzz -fuzztime=5m ./internal/output/...
+        run: |
+          export GOTOOLCHAIN=auto
+          go test -fuzz=Fuzz -fuzztime=5m ./internal/output/...
         continue-on-error: true
 
       - name: Check fuzz results
@@ -201,11 +211,13 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.23'
+          go-version-file: go.mod
           cache: true
 
       - name: Run benchmarks
-        run: go test -bench=. -benchmem -benchtime=5s ${{ matrix.package }}
+        run: |
+          export GOTOOLCHAIN=auto
+          go test -bench=. -benchmem -benchtime=5s ${{ matrix.package }}
 
   security:
     name: Security Scan
@@ -217,7 +229,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.23'
+          go-version-file: go.mod
           cache: true
 
       - name: Run Gosec Security Scanner
@@ -248,11 +260,13 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.23'
+          go-version-file: go.mod
           cache: true
 
       - name: Build
-        run: go build -v -o bin/redmine ./cmd
+        run: |
+          export GOTOOLCHAIN=auto
+          go build -v -o bin/redmine ./cmd
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
@@ -261,7 +275,6 @@ jobs:
           path: bin/redmine
           retention-days: 30
 
-  # 汇总 job，供 branch protection 的 required check 使用
   ci-passed:
     name: CI Passed
     runs-on: ubuntu-latest
