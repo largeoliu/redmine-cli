@@ -790,7 +790,7 @@ func TestClient_List_InvalidJSON(t *testing.T) {
 
 	mock.Handle("/issues.json", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte("invalid json"))
+		_, _ = w.Write([]byte("invalid json")) //nolint:errcheck
 	})
 
 	baseClient := client.NewClient(mock.URL, "test-key")
@@ -809,7 +809,7 @@ func TestClient_Get_InvalidJSON(t *testing.T) {
 
 	mock.Handle("/issues/1.json", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte("invalid json"))
+		_, _ = w.Write([]byte("invalid json")) //nolint:errcheck
 	})
 
 	baseClient := client.NewClient(mock.URL, "test-key")
@@ -828,7 +828,7 @@ func TestClient_Create_InvalidJSON(t *testing.T) {
 
 	mock.Handle("/issues.json", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte("invalid json"))
+		_, _ = w.Write([]byte("invalid json")) //nolint:errcheck
 	})
 
 	baseClient := client.NewClient(mock.URL, "test-key")
@@ -852,7 +852,7 @@ func TestClient_List_EmptyResponse(t *testing.T) {
 
 	mock.Handle("/issues.json", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte("{}"))
+		_, _ = w.Write([]byte("{}")) //nolint:errcheck
 	})
 
 	baseClient := client.NewClient(mock.URL, "test-key")
@@ -877,8 +877,7 @@ func TestClient_Get_MissingIssueField(t *testing.T) {
 
 	mock.Handle("/issues/1.json", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		// 返回一个没有 issue 字段的 JSON
-		w.Write([]byte(`{"message": "success"}`))
+		_, _ = w.Write([]byte(`{"message": "success"}`)) //nolint:errcheck
 	})
 
 	baseClient := client.NewClient(mock.URL, "test-key")
@@ -901,8 +900,7 @@ func TestClient_Create_MissingIssueField(t *testing.T) {
 
 	mock.Handle("/issues.json", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		// 返回一个没有 issue 字段的 JSON
-		w.Write([]byte(`{"message": "created"}`))
+		_, _ = w.Write([]byte(`{"message": "created"}`)) //nolint:errcheck
 	})
 
 	baseClient := client.NewClient(mock.URL, "test-key")

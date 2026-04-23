@@ -70,8 +70,10 @@ func (c *Client) Delete(ctx context.Context, id int) error {
 type ListFlags struct {
 	ProjectID    int
 	TrackerID    int
+	VersionID    int
 	StatusID     int
 	AssignedToID int
+	SprintID     int
 	Limit        int
 	Offset       int
 	Query        string
@@ -87,11 +89,23 @@ func BuildListParams(flags ListFlags) map[string]string {
 	if flags.TrackerID > 0 {
 		params["tracker_id"] = strconv.Itoa(flags.TrackerID)
 	}
+	if flags.VersionID > 0 {
+		params["fixed_version_id"] = strconv.Itoa(flags.VersionID)
+	}
 	if flags.StatusID > 0 {
 		params["status_id"] = strconv.Itoa(flags.StatusID)
 	}
 	if flags.AssignedToID > 0 {
 		params["assigned_to_id"] = strconv.Itoa(flags.AssignedToID)
+	}
+	if flags.SprintID > 0 {
+		// Redmine Agile plugin sprint filter parameters.
+		params["set_filter"] = "1"
+		params["f[]"] = "agile_sprints"
+		// This server expects an explicit equals operator here.
+		// Empty operator triggers HTTP 500 on some Redmine Agile deployments.
+		params["op[agile_sprints]"] = "="
+		params["v[agile_sprints][]"] = strconv.Itoa(flags.SprintID)
 	}
 	if flags.Limit > 0 {
 		params["limit"] = strconv.Itoa(flags.Limit)

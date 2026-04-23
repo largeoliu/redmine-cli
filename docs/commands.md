@@ -192,6 +192,7 @@ redmine issues list
 | `--tracker` | 按追踪器名称筛选，`全部` 表示不过滤 |
 | `--tracker-id` | 按追踪器 ID 筛选 |
 | `--assigned-to-id` | 按 assignee ID 筛选 |
+| `--version-id` | 按版本 ID 筛选 |
 | `--include` | 包含关联数据（children、attachments、relations、changesets、journals、watchers） |
 
 **示例：**
@@ -208,6 +209,9 @@ redmine issue list --status-id 1
 
 # 按追踪器名称筛选
 redmine issue list --tracker 需求
+
+# 按版本筛选
+redmine issue list --version-id 123
 
 # 不筛选追踪器
 redmine issue list --tracker 全部
@@ -278,6 +282,7 @@ redmine issue create \
   --subject "Bug report" \
   --description "Found a bug" \
   --tracker-id 1 \
+  --version-id 123 \
   --priority-id 2 \
   --assigned-to-id 5
 
@@ -312,6 +317,7 @@ redmine issues update <id> [flags]
 
 ```bash
 redmine issue update 123 --status-id 2
+redmine issue update 123 --version-id 456
 redmine issue update 123 --priority-id 3 --assigned-to-id 5
 ```
 

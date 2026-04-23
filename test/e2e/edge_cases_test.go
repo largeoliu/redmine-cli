@@ -118,6 +118,7 @@ func TestEmptyIssueList(t *testing.T) {
 	stdout, _, exitCode := runCommand(
 		"--url", server.URL,
 		"--key", "test-api-key",
+		"--project-id", "1",
 		"issues", "list",
 	)
 
@@ -453,6 +454,7 @@ func TestAllOutputFormatsForIssues(t *testing.T) {
 				"--url", server.URL,
 				"--key", "test-api-key",
 				"--format", format,
+				"--project-id", "1",
 				"issues", "list",
 			)
 
@@ -726,6 +728,7 @@ func TestMultipleFlagsCombined(t *testing.T) {
 		"--limit", "5",
 		"--offset", "10",
 		"--format", "json",
+		"--project-id", "1",
 		"issues", "list",
 		"--sort", "updated_on:desc",
 	)
