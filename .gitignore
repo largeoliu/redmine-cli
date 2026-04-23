@@ -45,3 +45,4 @@ test/integration/.env
 # Trae IDE specs (not tracked in git)
 .trae/
 docs/superpowers/
+.gstack/

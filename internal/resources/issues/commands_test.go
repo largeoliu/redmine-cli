@@ -197,6 +197,73 @@ func TestListCommand_VersionIDFilter(t *testing.T) {
 	}
 }
 
+func TestListCommand_SprintIDFilter(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleJSON("/projects/1/agile_sprints.json", map[string]any{
+		"agile_sprints": []map[string]any{
+			{"id": 10, "name": "Sprint 10"},
+		},
+	})
+
+	mock.Handle("/issues.json", func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		if got := q.Get("set_filter"); got != "1" {
+			// Use Errorf so the handler still returns a response and the
+			// command doesn't retry/EOF in a loop.
+			t.Errorf("expected set_filter=1, got %q (raw query: %s)", got, r.URL.RawQuery)
+		}
+
+		// f[]=agile_sprints
+		filters, ok := q["f[]"]
+		if !ok {
+			t.Errorf("expected f[]=agile_sprints, got none (raw query: %s)", r.URL.RawQuery)
+		} else {
+			found := false
+			for _, v := range filters {
+				if v == "agile_sprints" {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expected f[]=agile_sprints, got %v (raw query: %s)", filters, r.URL.RawQuery)
+			}
+		}
+
+		// op[agile_sprints]== (equal operator)
+		if op, ok := q["op[agile_sprints]"]; !ok || len(op) == 0 || op[0] != "=" {
+			t.Errorf("expected op[agile_sprints]==, got %v (raw query: %s)", op, r.URL.RawQuery)
+		}
+
+		// v[agile_sprints][]=10
+		if got := q.Get("v[agile_sprints][]"); got != "10" {
+			t.Errorf("expected v[agile_sprints][]=10, got %q (raw query: %s)", got, r.URL.RawQuery)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(sampleIssueList())
+	})
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return nil
+		},
+	}
+
+	root := NewCommand(flags, resolver)
+	root.SetArgs([]string{"list", "--project-id", "1", "--sprint", "10"})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestListCommand_ResolveClientError(t *testing.T) {
 	flags := &types.GlobalFlags{}
 	resolver := &mockResolver{
@@ -810,29 +877,39 @@ func TestDeleteCommand_ConfirmationWithYes(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	flags := &types.GlobalFlags{Yes: false}
-	resolver := &mockResolver{
-		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
-			return client.NewClient(mock.URL, "test-key"), nil
-		},
+	testCases := []struct {
+		name  string
+		input string
+	}{
+		{"lowercase y", "y\n"},
+		{"uppercase Y", "Y\n"},
 	}
 
-	// 模拟用户输入 'y'
-	input := "y\n"
-	r, w, _ := os.Pipe()
-	_, _ = w.WriteString(input)
-	w.Close()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			flags := &types.GlobalFlags{Yes: false}
+			resolver := &mockResolver{
+				resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+					return client.NewClient(mock.URL, "test-key"), nil
+				},
+			}
 
-	oldStdin := os.Stdin
-	defer func() { os.Stdin = oldStdin }()
-	os.Stdin = r
+			r, w, _ := os.Pipe()
+			_, _ = w.WriteString(tc.input)
+			w.Close()
 
-	cmd := newDeleteCommand(flags, resolver)
-	cmd.SetArgs([]string{"1"})
+			oldStdin := os.Stdin
+			defer func() { os.Stdin = oldStdin }()
+			os.Stdin = r
 
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+			cmd := newDeleteCommand(flags, resolver)
+			cmd.SetArgs([]string{"1"})
+
+			err := cmd.Execute()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
 	}
 }
 
