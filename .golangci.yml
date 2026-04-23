@@ -1,5 +1,8 @@
 version: "2"
 
+run:
+  timeout: 5m
+
 linters:
   enable:
     - errcheck
@@ -85,6 +88,10 @@ linters:
           - misspell
           - staticcheck
 
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
 formatters:
   enable:
     - gofmt
@@ -95,7 +102,3 @@ formatters:
     goimports:
       local-prefixes:
         - github.com/largeoliu/redmine-cli
-
-issues:
-  max-issues-per-linter: 0
-  max-same-issues: 0
