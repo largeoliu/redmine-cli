@@ -232,9 +232,10 @@ func TestListCommand_SprintIDFilter(t *testing.T) {
 			}
 		}
 
-		// op[agile_sprints]= (equal operator)
-		if op, ok := q["op[agile_sprints]"]; !ok || len(op) == 0 || op[0] != "" {
-			t.Errorf("expected op[agile_sprints]=, got %v (raw query: %s)", op, r.URL.RawQuery)
+
+		// op[agile_sprints]== (equal operator)
+		if op, ok := q["op[agile_sprints]"]; !ok || len(op) == 0 || op[0] != "=" {
+			t.Errorf("expected op[agile_sprints]==, got %v (raw query: %s)", op, r.URL.RawQuery)
 		}
 
 		// v[agile_sprints][]=10

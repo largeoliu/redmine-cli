@@ -102,7 +102,9 @@ func BuildListParams(flags ListFlags) map[string]string {
 		// Redmine Agile plugin sprint filter parameters.
 		params["set_filter"] = "1"
 		params["f[]"] = "agile_sprints"
-		params["op[agile_sprints]"] = ""
+		// This server expects an explicit equals operator here.
+		// Empty operator triggers HTTP 500 on some Redmine Agile deployments.
+		params["op[agile_sprints]"] = "="
 		params["v[agile_sprints][]"] = strconv.Itoa(flags.SprintID)
 	}
 	if flags.Limit > 0 {
