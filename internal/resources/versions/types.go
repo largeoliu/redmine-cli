@@ -14,7 +14,7 @@ type Version struct {
 	Name        string              `json:"name"`
 	Description string              `json:"description,omitempty"`
 	Status      string              `json:"status"`
-	DueDate     *time.Time          `json:"due_date,omitempty"`
+	DueDate     string              `json:"due_date,omitempty"`
 	CreatedOn   *time.Time          `json:"created_on,omitempty"`
 	UpdatedOn   *time.Time          `json:"updated_on,omitempty"`
 }

@@ -3,6 +3,7 @@ package issues
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -11,11 +12,60 @@ import (
 	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 
+	"github.com/largeoliu/redmine-cli/internal/client"
 	"github.com/largeoliu/redmine-cli/internal/errors"
 	"github.com/largeoliu/redmine-cli/internal/resources/helpers"
 	"github.com/largeoliu/redmine-cli/internal/resources/trackers"
 	"github.com/largeoliu/redmine-cli/internal/types"
 )
+
+type sprintListResponse struct {
+	AgileSprints []sprintRef `json:"agile_sprints"`
+}
+
+type sprintRef struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
+func resolveSprintID(ctx context.Context, c *client.Client, projectID int, selector string) (int, error) {
+	if selector == "" {
+		return 0, nil
+	}
+	if id, err := strconv.Atoi(selector); err == nil {
+		if id <= 0 {
+			return 0, errors.NewValidation("--sprint must be a positive integer or sprint name")
+		}
+		return id, nil
+	}
+
+	// Avoid importing internal/resources/agile here to prevent an import cycle:
+	// agile uses issues (board report), and issues needs sprint lookup.
+	var resp sprintListResponse
+	if err := c.Get(ctx, fmt.Sprintf("/projects/%d/agile_sprints.json", projectID), &resp); err != nil {
+		return 0, err
+	}
+
+	var matches []sprintRef
+	for _, s := range resp.AgileSprints {
+		if s.Name == selector {
+			matches = append(matches, s)
+		}
+	}
+
+	switch len(matches) {
+	case 0:
+		return 0, errors.NewValidation("sprint not found: " + selector)
+	case 1:
+		return matches[0].ID, nil
+	default:
+		ids := make([]string, 0, len(matches))
+		for _, s := range matches {
+			ids = append(ids, strconv.Itoa(s.ID))
+		}
+		return 0, errors.NewValidation("multiple sprints match name: " + selector + " (ids: " + strings.Join(ids, ",") + ")")
+	}
+}
 
 type customFieldFlags struct {
 	Fields []string
@@ -217,10 +267,15 @@ func NewCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Comman
 func newListCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Command {
 	listFlags := &ListFlags{}
 	var trackerSelector string
+	var sprintSelector string
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List issues",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if listFlags.ProjectID == 0 {
+				return errors.NewValidation("--project-id is required")
+			}
+			statusChanged := cmd.Flags().Changed("status-id")
 			// 使用全局标志的 limit 和 offset（如果设置了的话）
 			if flags.Limit > 0 {
 				listFlags.Limit = flags.Limit
@@ -229,23 +284,35 @@ func newListCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Co
 				listFlags.Offset = flags.Offset
 			}
 
-			c, err := resolver.ResolveClient(flags)
-			if err != nil {
-				return err
+			c, resolveErr := resolver.ResolveClient(flags)
+			if resolveErr != nil {
+				return resolveErr
+			}
+			if cmd.Flags().Changed("sprint") {
+				sprintID, sprintErr := resolveSprintID(cmd.Context(), c, listFlags.ProjectID, sprintSelector)
+				if sprintErr != nil {
+					return sprintErr
+				}
+				listFlags.SprintID = sprintID
 			}
 			if cmd.Flags().Changed("tracker") {
 				switch {
 				case trackerSelector == "", strings.EqualFold(trackerSelector, "全部"), strings.EqualFold(trackerSelector, "all"):
-					listFlags.TrackerID = 0
+					listFlags.TrackerID = nil
 				default:
 					trackerDef, trackerErr := trackers.NewClient(c).FindByName(cmd.Context(), trackerSelector)
 					if trackerErr != nil {
 						return trackerErr
 					}
-					listFlags.TrackerID = trackerDef.ID
+					listFlags.TrackerID = []int{trackerDef.ID}
 				}
 			}
 			params := BuildListParams(*listFlags)
+			// Redmine defaults to "open" when status_id is omitted.
+			// If user did not explicitly set --status-id, request all statuses.
+			if !statusChanged {
+				params["status_id"] = "*"
+			}
 			result, err := NewClient(c).List(cmd.Context(), params)
 			if err != nil {
 				return err
@@ -254,11 +321,13 @@ func newListCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Co
 		},
 	}
 	cmd.Flags().IntVar(&listFlags.ProjectID, "project-id", 0, "Filter by project ID")
+	cmd.Flags().StringVar(&sprintSelector, "sprint", "", "Filter by sprint ID or exact sprint name")
 	cmd.Flags().StringVar(&trackerSelector, "tracker", "", "Filter by tracker name (use 全部 to skip filtering)")
-	cmd.Flags().IntVar(&listFlags.TrackerID, "tracker-id", 0, "Filter by tracker ID")
-	cmd.Flags().IntVar(&listFlags.StatusID, "status-id", 0, "Filter by status ID")
-	cmd.Flags().IntVar(&listFlags.AssignedToID, "assigned-to-id", 0, "Filter by assigned user ID")
-	cmd.Flags().StringVar(&listFlags.Query, "query", "", "Filter by custom query ID")
+	cmd.Flags().IntSliceVar(&listFlags.TrackerID, "tracker-id", nil, "Filter by tracker ID (can be specified multiple times)")
+	cmd.Flags().IntSliceVar(&listFlags.VersionID, "version-id", nil, "Filter by fixed version ID (can be specified multiple times)")
+	cmd.Flags().IntSliceVar(&listFlags.StatusID, "status-id", nil, "Filter by status ID (can be specified multiple times)")
+	cmd.Flags().IntSliceVar(&listFlags.AssignedToID, "assigned-to-id", nil, "Filter by assigned user ID (can be specified multiple times)")
+	cmd.Flags().StringSliceVar(&listFlags.Query, "query", nil, "Filter by custom query ID (can be specified multiple times)")
 	cmd.Flags().StringVar(&listFlags.Sort, "sort", "", "Sort field (e.g., created_on:desc)")
 	return cmd
 }
@@ -349,7 +418,7 @@ func newCreateCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.
 	cmd.Flags().IntVar(&req.PriorityID, "priority-id", 0, "Priority ID")
 	cmd.Flags().IntVar(&req.AssignedToID, "assigned-to-id", 0, "Assigned user ID")
 	cmd.Flags().IntVar(&req.CategoryID, "category-id", 0, "Category ID")
-	cmd.Flags().IntVar(&req.FixedVersionID, "fixed-version-id", 0, "Target version ID")
+	cmd.Flags().IntVar(&req.FixedVersionID, "version-id", 0, "Target version ID")
 	cmd.Flags().StringVar(&req.StartDate, "start-date", "", "Start date (YYYY-MM-DD)")
 	cmd.Flags().StringVar(&req.DueDate, "due-date", "", "Due date (YYYY-MM-DD)")
 	cmd.Flags().IntVar(&req.DoneRatio, "done-ratio", 0, "Done ratio (0-100)")
@@ -400,7 +469,7 @@ func newUpdateCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.
 	cmd.Flags().IntVar(&req.PriorityID, "priority-id", 0, "Priority ID")
 	cmd.Flags().IntVar(&req.AssignedToID, "assigned-to-id", 0, "Assigned user ID")
 	cmd.Flags().IntVar(&req.CategoryID, "category-id", 0, "Category ID")
-	cmd.Flags().IntVar(&req.FixedVersionID, "fixed-version-id", 0, "Target version ID")
+	cmd.Flags().IntVar(&req.FixedVersionID, "version-id", 0, "Target version ID")
 	cmd.Flags().StringVar(&req.StartDate, "start-date", "", "Start date (YYYY-MM-DD)")
 	cmd.Flags().StringVar(&req.DueDate, "due-date", "", "Due date (YYYY-MM-DD)")
 	cmd.Flags().IntVar(&req.DoneRatio, "done-ratio", 0, "Done ratio (0-100)")

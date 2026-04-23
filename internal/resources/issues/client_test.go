@@ -93,7 +93,10 @@ func newMockServer() *mockServer {
 func (m *mockServer) handleJSON(path string, response any) {
 	m.mux.HandleFunc(path, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			// Log but don't fail - this is test infrastructure
+			_, _ = w.Write([]byte(`{}`))
+		}
 	})
 }
 
@@ -102,9 +105,11 @@ func (m *mockServer) handleError(path string, statusCode int, message string) {
 	m.mux.HandleFunc(path, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(statusCode)
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
+		if err := json.NewEncoder(w).Encode(map[string]any{
 			"errors": []string{message},
-		})
+		}); err != nil {
+			_, _ = w.Write([]byte(`{}`))
+		}
 	})
 }
 
@@ -154,7 +159,7 @@ func TestClient_List(t *testing.T) {
 						t.Errorf("expected status_id=2, got %s", r.URL.Query().Get("status_id"))
 					}
 					w.Header().Set("Content-Type", "application/json")
-					json.NewEncoder(w).Encode(sampleIssueList())
+					_ = json.NewEncoder(w).Encode(sampleIssueList()) //nolint:errcheck
 				})
 			},
 			params:    map[string]string{"project_id": "1", "status_id": "2"},
@@ -289,7 +294,7 @@ func TestClient_Get(t *testing.T) {
 						"issue": sampleIssue(),
 					}
 					w.Header().Set("Content-Type", "application/json")
-					json.NewEncoder(w).Encode(response)
+					_ = json.NewEncoder(w).Encode(response)
 				})
 			},
 			params:  map[string]string{"include": "relations"},
@@ -416,7 +421,7 @@ func TestClient_Create(t *testing.T) {
 						"issue": createdIssue,
 					}
 					w.Header().Set("Content-Type", "application/json")
-					json.NewEncoder(w).Encode(response)
+					_ = json.NewEncoder(w).Encode(response)
 				})
 			},
 			wantErr: false,
@@ -801,7 +806,7 @@ func TestBuildListParams(t *testing.T) {
 		{
 			name: "单个参数 - TrackerID",
 			flags: ListFlags{
-				TrackerID: 2,
+				TrackerID: []int{2},
 			},
 			expected: map[string]string{
 				"tracker_id": "2",
@@ -810,7 +815,7 @@ func TestBuildListParams(t *testing.T) {
 		{
 			name: "单个参数 - StatusID",
 			flags: ListFlags{
-				StatusID: 3,
+				StatusID: []int{3},
 			},
 			expected: map[string]string{
 				"status_id": "3",
@@ -819,7 +824,7 @@ func TestBuildListParams(t *testing.T) {
 		{
 			name: "单个参数 - AssignedToID",
 			flags: ListFlags{
-				AssignedToID: 4,
+				AssignedToID: []int{4},
 			},
 			expected: map[string]string{
 				"assigned_to_id": "4",
@@ -846,7 +851,7 @@ func TestBuildListParams(t *testing.T) {
 		{
 			name: "单个参数 - Query",
 			flags: ListFlags{
-				Query: "123",
+				Query: []string{"123"},
 			},
 			expected: map[string]string{
 				"query_id": "123",
@@ -865,12 +870,12 @@ func TestBuildListParams(t *testing.T) {
 			name: "多个参数组合",
 			flags: ListFlags{
 				ProjectID:    1,
-				TrackerID:    2,
-				StatusID:     3,
-				AssignedToID: 4,
+				TrackerID:    []int{2},
+				StatusID:     []int{3},
+				AssignedToID: []int{4},
 				Limit:        25,
 				Offset:       10,
-				Query:        "123",
+				Query:        []string{"123"},
 				Sort:         "updated_on:desc",
 			},
 			expected: map[string]string{
@@ -888,12 +893,12 @@ func TestBuildListParams(t *testing.T) {
 			name: "零值参数应被忽略",
 			flags: ListFlags{
 				ProjectID:    0,
-				TrackerID:    0,
-				StatusID:     0,
-				AssignedToID: 0,
+				TrackerID:    nil,
+				StatusID:     nil,
+				AssignedToID: nil,
 				Limit:        0,
 				Offset:       0,
-				Query:        "",
+				Query:        nil,
 				Sort:         "",
 			},
 			expected: map[string]string{},
@@ -902,7 +907,7 @@ func TestBuildListParams(t *testing.T) {
 			name: "部分参数",
 			flags: ListFlags{
 				ProjectID: 1,
-				StatusID:  2,
+				StatusID:  []int{2},
 				Limit:     10,
 			},
 			expected: map[string]string{
@@ -914,7 +919,7 @@ func TestBuildListParams(t *testing.T) {
 		{
 			name: "字符串参数 - 空字符串应被忽略",
 			flags: ListFlags{
-				Query: "",
+				Query: nil,
 				Sort:  "",
 			},
 			expected: map[string]string{},
@@ -922,12 +927,39 @@ func TestBuildListParams(t *testing.T) {
 		{
 			name: "字符串参数 - 非空字符串应被包含",
 			flags: ListFlags{
-				Query: "456",
+				Query: []string{"456"},
 				Sort:  "created_on:asc",
 			},
 			expected: map[string]string{
 				"query_id": "456",
 				"sort":     "created_on:asc",
+			},
+		},
+		{
+			name: "多值参数 - 多个 tracker",
+			flags: ListFlags{
+				TrackerID: []int{1, 2, 3},
+			},
+			expected: map[string]string{
+				"tracker_id": "1|2|3",
+			},
+		},
+		{
+			name: "多值参数 - 多个 status",
+			flags: ListFlags{
+				StatusID: []int{1, 3, 5},
+			},
+			expected: map[string]string{
+				"status_id": "1|3|5",
+			},
+		},
+		{
+			name: "多值参数 - 多个 query",
+			flags: ListFlags{
+				Query: []string{"10", "20", "30"},
+			},
+			expected: map[string]string{
+				"query_id": "10|20|30",
 			},
 		},
 	}
@@ -1115,7 +1147,7 @@ func TestClient_List_EmptyParams(t *testing.T) {
 			t.Errorf("expected no query params, got %v", r.URL.Query())
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(sampleIssueList())
+		_ = json.NewEncoder(w).Encode(sampleIssueList())
 	})
 
 	baseClient := client.NewClient(mock.URL, "test-key")
@@ -1145,7 +1177,7 @@ func TestClient_Get_EmptyParams(t *testing.T) {
 			"issue": sampleIssue(),
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	})
 
 	baseClient := client.NewClient(mock.URL, "test-key")
@@ -1313,7 +1345,7 @@ func TestClient_List_WithAllQueryParams(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(sampleIssueList())
+		_ = json.NewEncoder(w).Encode(sampleIssueList())
 	})
 
 	baseClient := client.NewClient(mock.URL, "test-key")
@@ -1355,7 +1387,7 @@ func TestClient_Get_WithIncludeParam(t *testing.T) {
 			"issue": sampleIssue(),
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	})
 
 	baseClient := client.NewClient(mock.URL, "test-key")
@@ -1422,7 +1454,7 @@ func TestClient_Create_WithAllFields(t *testing.T) {
 			"issue": createdIssue,
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	})
 
 	baseClient := client.NewClient(mock.URL, "test-key")
@@ -1743,26 +1775,26 @@ func TestClient_Delete_Conflict(t *testing.T) {
 func TestListFlags(t *testing.T) {
 	flags := ListFlags{
 		ProjectID:    1,
-		TrackerID:    2,
-		StatusID:     3,
-		AssignedToID: 4,
+		TrackerID:    []int{2},
+		StatusID:     []int{3},
+		AssignedToID: []int{4},
 		Limit:        25,
 		Offset:       10,
-		Query:        "123",
+		Query:        []string{"123"},
 		Sort:         "updated_on:desc",
 	}
 
 	if flags.ProjectID != 1 {
 		t.Errorf("expected ProjectID 1, got %d", flags.ProjectID)
 	}
-	if flags.TrackerID != 2 {
-		t.Errorf("expected TrackerID 2, got %d", flags.TrackerID)
+	if len(flags.TrackerID) != 1 || flags.TrackerID[0] != 2 {
+		t.Errorf("expected TrackerID [2], got %v", flags.TrackerID)
 	}
-	if flags.StatusID != 3 {
-		t.Errorf("expected StatusID 3, got %d", flags.StatusID)
+	if len(flags.StatusID) != 1 || flags.StatusID[0] != 3 {
+		t.Errorf("expected StatusID [3], got %v", flags.StatusID)
 	}
-	if flags.AssignedToID != 4 {
-		t.Errorf("expected AssignedToID 4, got %d", flags.AssignedToID)
+	if len(flags.AssignedToID) != 1 || flags.AssignedToID[0] != 4 {
+		t.Errorf("expected AssignedToID [4], got %v", flags.AssignedToID)
 	}
 	if flags.Limit != 25 {
 		t.Errorf("expected Limit 25, got %d", flags.Limit)
@@ -1770,8 +1802,8 @@ func TestListFlags(t *testing.T) {
 	if flags.Offset != 10 {
 		t.Errorf("expected Offset 10, got %d", flags.Offset)
 	}
-	if flags.Query != "123" {
-		t.Errorf("expected Query '123', got %s", flags.Query)
+	if len(flags.Query) != 1 || flags.Query[0] != "123" {
+		t.Errorf("expected Query ['123'], got %v", flags.Query)
 	}
 	if flags.Sort != "updated_on:desc" {
 		t.Errorf("expected Sort 'updated_on:desc', got %s", flags.Sort)
