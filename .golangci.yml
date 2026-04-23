@@ -1,5 +1,8 @@
 version: "2"
 
+run:
+  timeout: 5m
+
 linters:
   enable:
     - errcheck
@@ -52,38 +55,41 @@ linters:
         - name: unused-parameter
         - name: unreachable-code
         - name: redefines-builtin-id
-  exclusions:
-    rules:
-      - path: _test\.go
-        linters:
-          - dupl
-          - gocyclo
-          - errcheck
-          - gosec
-          - revive
-          - govet
-          - misspell
-          - staticcheck
-      - path: (^|/)test/e2e/
-        linters:
-          - dupl
-          - gocyclo
-          - errcheck
-          - gosec
-          - revive
-          - govet
-          - misspell
-          - staticcheck
-      - path: (^|/)test/integration/
-        linters:
-          - dupl
-          - gocyclo
-          - errcheck
-          - gosec
-          - revive
-          - govet
-          - misspell
-          - staticcheck
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - dupl
+        - gocyclo
+        - errcheck
+        - gosec
+        - revive
+        - govet
+        - misspell
+        - staticcheck
+    - path: (^|/)test/e2e/
+      linters:
+        - dupl
+        - gocyclo
+        - errcheck
+        - gosec
+        - revive
+        - govet
+        - misspell
+        - staticcheck
+    - path: (^|/)test/integration/
+      linters:
+        - dupl
+        - gocyclo
+        - errcheck
+        - gosec
+        - revive
+        - govet
+        - misspell
+        - staticcheck
 
 formatters:
   enable:
@@ -95,7 +101,3 @@ formatters:
     goimports:
       local-prefixes:
         - github.com/largeoliu/redmine-cli
-
-issues:
-  max-issues-per-linter: 0
-  max-same-issues: 0
