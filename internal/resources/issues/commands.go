@@ -284,14 +284,14 @@ func newListCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Co
 				listFlags.Offset = flags.Offset
 			}
 
-			c, err := resolver.ResolveClient(flags)
-			if err != nil {
-				return err
+			c, resolveErr := resolver.ResolveClient(flags)
+			if resolveErr != nil {
+				return resolveErr
 			}
 			if cmd.Flags().Changed("sprint") {
-				sprintID, err := resolveSprintID(cmd.Context(), c, listFlags.ProjectID, sprintSelector)
-				if err != nil {
-					return err
+				sprintID, sprintErr := resolveSprintID(cmd.Context(), c, listFlags.ProjectID, sprintSelector)
+				if sprintErr != nil {
+					return sprintErr
 				}
 				listFlags.SprintID = sprintID
 			}
