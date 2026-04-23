@@ -73,6 +73,7 @@ type ListFlags struct {
 	VersionID    int
 	StatusID     int
 	AssignedToID int
+	SprintID     int
 	Limit        int
 	Offset       int
 	Query        string
@@ -96,6 +97,13 @@ func BuildListParams(flags ListFlags) map[string]string {
 	}
 	if flags.AssignedToID > 0 {
 		params["assigned_to_id"] = strconv.Itoa(flags.AssignedToID)
+	}
+	if flags.SprintID > 0 {
+		// Redmine Agile plugin sprint filter parameters.
+		params["set_filter"] = "1"
+		params["f[]"] = "agile_sprints"
+		params["op[agile_sprints]"] = ""
+		params["v[agile_sprints][]"] = strconv.Itoa(flags.SprintID)
 	}
 	if flags.Limit > 0 {
 		params["limit"] = strconv.Itoa(flags.Limit)
