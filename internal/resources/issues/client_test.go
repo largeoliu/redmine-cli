@@ -159,7 +159,7 @@ func TestClient_List(t *testing.T) {
 						t.Errorf("expected status_id=2, got %s", r.URL.Query().Get("status_id"))
 					}
 					w.Header().Set("Content-Type", "application/json")
-					json.NewEncoder(w).Encode(sampleIssueList())
+					_ = json.NewEncoder(w).Encode(sampleIssueList()) //nolint:errcheck
 				})
 			},
 			params:    map[string]string{"project_id": "1", "status_id": "2"},
@@ -294,7 +294,7 @@ func TestClient_Get(t *testing.T) {
 						"issue": sampleIssue(),
 					}
 					w.Header().Set("Content-Type", "application/json")
-					json.NewEncoder(w).Encode(response)
+					_ = json.NewEncoder(w).Encode(response)
 				})
 			},
 			params:  map[string]string{"include": "relations"},
@@ -421,7 +421,7 @@ func TestClient_Create(t *testing.T) {
 						"issue": createdIssue,
 					}
 					w.Header().Set("Content-Type", "application/json")
-					json.NewEncoder(w).Encode(response)
+					_ = json.NewEncoder(w).Encode(response)
 				})
 			},
 			wantErr: false,
@@ -1120,7 +1120,7 @@ func TestClient_List_EmptyParams(t *testing.T) {
 			t.Errorf("expected no query params, got %v", r.URL.Query())
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(sampleIssueList())
+		_ = json.NewEncoder(w).Encode(sampleIssueList())
 	})
 
 	baseClient := client.NewClient(mock.URL, "test-key")
@@ -1150,7 +1150,7 @@ func TestClient_Get_EmptyParams(t *testing.T) {
 			"issue": sampleIssue(),
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	})
 
 	baseClient := client.NewClient(mock.URL, "test-key")
@@ -1318,7 +1318,7 @@ func TestClient_List_WithAllQueryParams(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(sampleIssueList())
+		_ = json.NewEncoder(w).Encode(sampleIssueList())
 	})
 
 	baseClient := client.NewClient(mock.URL, "test-key")
@@ -1360,7 +1360,7 @@ func TestClient_Get_WithIncludeParam(t *testing.T) {
 			"issue": sampleIssue(),
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	})
 
 	baseClient := client.NewClient(mock.URL, "test-key")
@@ -1427,7 +1427,7 @@ func TestClient_Create_WithAllFields(t *testing.T) {
 			"issue": createdIssue,
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	})
 
 	baseClient := client.NewClient(mock.URL, "test-key")
