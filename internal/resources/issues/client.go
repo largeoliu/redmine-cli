@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/largeoliu/redmine-cli/internal/client"
 )
@@ -69,14 +70,14 @@ func (c *Client) Delete(ctx context.Context, id int) error {
 // ListFlags represents flags for filtering issues in a list operation.
 type ListFlags struct {
 	ProjectID    int
-	TrackerID    int
-	VersionID    int
-	StatusID     int
-	AssignedToID int
+	TrackerID    []int
+	VersionID    []int
+	StatusID     []int
+	AssignedToID []int
 	SprintID     int
 	Limit        int
 	Offset       int
-	Query        string
+	Query        []string
 	Sort         string
 }
 
@@ -86,24 +87,37 @@ func BuildListParams(flags ListFlags) map[string]string {
 	if flags.ProjectID > 0 {
 		params["project_id"] = strconv.Itoa(flags.ProjectID)
 	}
-	if flags.TrackerID > 0 {
-		params["tracker_id"] = strconv.Itoa(flags.TrackerID)
+	if len(flags.TrackerID) > 0 {
+		vals := make([]string, len(flags.TrackerID))
+		for i, v := range flags.TrackerID {
+			vals[i] = strconv.Itoa(v)
+		}
+		params["tracker_id"] = strings.Join(vals, "|")
 	}
-	if flags.VersionID > 0 {
-		params["fixed_version_id"] = strconv.Itoa(flags.VersionID)
+	if len(flags.VersionID) > 0 {
+		vals := make([]string, len(flags.VersionID))
+		for i, v := range flags.VersionID {
+			vals[i] = strconv.Itoa(v)
+		}
+		params["fixed_version_id"] = strings.Join(vals, "|")
 	}
-	if flags.StatusID > 0 {
-		params["status_id"] = strconv.Itoa(flags.StatusID)
+	if len(flags.StatusID) > 0 {
+		vals := make([]string, len(flags.StatusID))
+		for i, v := range flags.StatusID {
+			vals[i] = strconv.Itoa(v)
+		}
+		params["status_id"] = strings.Join(vals, "|")
 	}
-	if flags.AssignedToID > 0 {
-		params["assigned_to_id"] = strconv.Itoa(flags.AssignedToID)
+	if len(flags.AssignedToID) > 0 {
+		vals := make([]string, len(flags.AssignedToID))
+		for i, v := range flags.AssignedToID {
+			vals[i] = strconv.Itoa(v)
+		}
+		params["assigned_to_id"] = strings.Join(vals, "|")
 	}
 	if flags.SprintID > 0 {
-		// Redmine Agile plugin sprint filter parameters.
 		params["set_filter"] = "1"
 		params["f[]"] = "agile_sprints"
-		// This server expects an explicit equals operator here.
-		// Empty operator triggers HTTP 500 on some Redmine Agile deployments.
 		params["op[agile_sprints]"] = "="
 		params["v[agile_sprints][]"] = strconv.Itoa(flags.SprintID)
 	}
@@ -113,8 +127,8 @@ func BuildListParams(flags ListFlags) map[string]string {
 	if flags.Offset > 0 {
 		params["offset"] = strconv.Itoa(flags.Offset)
 	}
-	if flags.Query != "" {
-		params["query_id"] = flags.Query
+	if len(flags.Query) > 0 {
+		params["query_id"] = strings.Join(flags.Query, "|")
 	}
 	if flags.Sort != "" {
 		params["sort"] = flags.Sort

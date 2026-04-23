@@ -298,13 +298,13 @@ func newListCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Co
 			if cmd.Flags().Changed("tracker") {
 				switch {
 				case trackerSelector == "", strings.EqualFold(trackerSelector, "全部"), strings.EqualFold(trackerSelector, "all"):
-					listFlags.TrackerID = 0
+					listFlags.TrackerID = nil
 				default:
 					trackerDef, trackerErr := trackers.NewClient(c).FindByName(cmd.Context(), trackerSelector)
 					if trackerErr != nil {
 						return trackerErr
 					}
-					listFlags.TrackerID = trackerDef.ID
+					listFlags.TrackerID = []int{trackerDef.ID}
 				}
 			}
 			params := BuildListParams(*listFlags)
@@ -323,11 +323,11 @@ func newListCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Co
 	cmd.Flags().IntVar(&listFlags.ProjectID, "project-id", 0, "Filter by project ID")
 	cmd.Flags().StringVar(&sprintSelector, "sprint", "", "Filter by sprint ID or exact sprint name")
 	cmd.Flags().StringVar(&trackerSelector, "tracker", "", "Filter by tracker name (use 全部 to skip filtering)")
-	cmd.Flags().IntVar(&listFlags.TrackerID, "tracker-id", 0, "Filter by tracker ID")
-	cmd.Flags().IntVar(&listFlags.VersionID, "version-id", 0, "Filter by fixed version ID")
-	cmd.Flags().IntVar(&listFlags.StatusID, "status-id", 0, "Filter by status ID")
-	cmd.Flags().IntVar(&listFlags.AssignedToID, "assigned-to-id", 0, "Filter by assigned user ID")
-	cmd.Flags().StringVar(&listFlags.Query, "query", "", "Filter by custom query ID")
+	cmd.Flags().IntSliceVar(&listFlags.TrackerID, "tracker-id", nil, "Filter by tracker ID (can be specified multiple times)")
+	cmd.Flags().IntSliceVar(&listFlags.VersionID, "version-id", nil, "Filter by fixed version ID (can be specified multiple times)")
+	cmd.Flags().IntSliceVar(&listFlags.StatusID, "status-id", nil, "Filter by status ID (can be specified multiple times)")
+	cmd.Flags().IntSliceVar(&listFlags.AssignedToID, "assigned-to-id", nil, "Filter by assigned user ID (can be specified multiple times)")
+	cmd.Flags().StringSliceVar(&listFlags.Query, "query", nil, "Filter by custom query ID (can be specified multiple times)")
 	cmd.Flags().StringVar(&listFlags.Sort, "sort", "", "Sort field (e.g., created_on:desc)")
 	return cmd
 }
