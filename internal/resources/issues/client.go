@@ -69,16 +69,16 @@ func (c *Client) Delete(ctx context.Context, id int) error {
 
 // ListFlags represents flags for filtering issues in a list operation.
 type ListFlags struct {
-	ProjectID     int
+	ProjectID    int
 	TrackerID    []int
 	VersionID    []int
 	StatusID     []int
 	AssignedToID []int
 	SprintID     int
-	Limit       int
-	Offset      int
-	Query       []string
-	Sort        string
+	Limit        int
+	Offset       int
+	Query        []string
+	Sort         string
 }
 
 // BuildListParams converts ListFlags to query parameters.

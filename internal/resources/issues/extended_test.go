@@ -485,14 +485,14 @@ func TestListCommand_WriteOutputError(t *testing.T) {
 // TestBuildListParams_ZeroValues 测试 BuildListParams 零值处理
 func TestBuildListParams_ZeroValues(t *testing.T) {
 	flags := ListFlags{
-		ProjectID:     0,
+		ProjectID:    0,
 		TrackerID:    nil,
 		StatusID:     nil,
 		AssignedToID: nil,
-		Limit:       0,
-		Offset:      0,
-		Query:      nil,
-		Sort:       "",
+		Limit:        0,
+		Offset:       0,
+		Query:        nil,
+		Sort:         "",
 	}
 
 	params := BuildListParams(flags)

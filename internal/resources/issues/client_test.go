@@ -869,17 +869,17 @@ func TestBuildListParams(t *testing.T) {
 		{
 			name: "多个参数组合",
 			flags: ListFlags{
-				ProjectID:     1,
+				ProjectID:    1,
 				TrackerID:    []int{2},
 				StatusID:     []int{3},
 				AssignedToID: []int{4},
 				Limit:        25,
-				Offset:      10,
-				Query:      []string{"123"},
-				Sort:       "updated_on:desc",
+				Offset:       10,
+				Query:        []string{"123"},
+				Sort:         "updated_on:desc",
 			},
 			expected: map[string]string{
-				"project_id":      "1",
+				"project_id":     "1",
 				"tracker_id":     "2",
 				"status_id":      "3",
 				"assigned_to_id": "4",
@@ -892,14 +892,14 @@ func TestBuildListParams(t *testing.T) {
 		{
 			name: "零值参数应被忽略",
 			flags: ListFlags{
-				ProjectID:     0,
+				ProjectID:    0,
 				TrackerID:    nil,
 				StatusID:     nil,
 				AssignedToID: nil,
 				Limit:        0,
 				Offset:       0,
-				Query:       nil,
-				Sort:        "",
+				Query:        nil,
+				Sort:         "",
 			},
 			expected: map[string]string{},
 		},
@@ -1774,14 +1774,14 @@ func TestClient_Delete_Conflict(t *testing.T) {
 // TestListFlags 测试 ListFlags 结构体
 func TestListFlags(t *testing.T) {
 	flags := ListFlags{
-		ProjectID:     1,
+		ProjectID:    1,
 		TrackerID:    []int{2},
 		StatusID:     []int{3},
 		AssignedToID: []int{4},
 		Limit:        25,
-		Offset:      10,
-		Query:      []string{"123"},
-		Sort:       "updated_on:desc",
+		Offset:       10,
+		Query:        []string{"123"},
+		Sort:         "updated_on:desc",
 	}
 
 	if flags.ProjectID != 1 {
