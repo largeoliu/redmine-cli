@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0](https://github.com/largeoliu/redmine-cli/compare/v0.3.0...v0.4.0) (2026-04-25)
+
+
+### Features
+
+* add sprint get command to show sprint details via agile_sprints API ([#66](https://github.com/largeoliu/redmine-cli/issues/66)) ([c9f0223](https://github.com/largeoliu/redmine-cli/commit/c9f022307b135ebe806a9e524f7c3d05589e49b6))
+* add version-id filtering for issues ([#65](https://github.com/largeoliu/redmine-cli/issues/65)) ([486a671](https://github.com/largeoliu/redmine-cli/commit/486a671350f3b96a47fd41387fc50908d41305f9))
+* **agile:** add agile content report ([c7c1265](https://github.com/largeoliu/redmine-cli/commit/c7c1265ad0070ab135246ace26ee0e93980ce811))
+* filter issues by sprint ([#68](https://github.com/largeoliu/redmine-cli/issues/68)) ([e266b3d](https://github.com/largeoliu/redmine-cli/commit/e266b3db1fbd7fe5ef53fad6af3e06ee9c940032))
+* require --project-id for issue list ([#67](https://github.com/largeoliu/redmine-cli/issues/67)) ([997e76a](https://github.com/largeoliu/redmine-cli/commit/997e76adb46cc3f316a726e520d293bbdc26d8c4))
+* **sprint:** 添加 --details 标志展示完整 sprint 详情 ([b423b90](https://github.com/largeoliu/redmine-cli/commit/b423b908df28834437d87cda9e2a73f91625f7cf))
+* **sprint:** 添加 sprint 子命令支持 ([9f8c5cc](https://github.com/largeoliu/redmine-cli/commit/9f8c5ccede67f7aa564aaa3903101cfb2b3d7a99))
+* support multiple values for issue list filters ([#70](https://github.com/largeoliu/redmine-cli/issues/70)) ([5d81bc9](https://github.com/largeoliu/redmine-cli/commit/5d81bc9fa9a24c2e8e4213feb7a94b262ca38e17))
+* 提升测试覆盖率并添加 Sprint 和 Agile 功能 ([223f630](https://github.com/largeoliu/redmine-cli/commit/223f6303ce00d8381111059c831b1efaa5d5a00d))
+
+
+### Bug Fixes
+
+* override tar dependency to resolve CVE-2026-29786 and CVE-2026-31802 ([#71](https://github.com/largeoliu/redmine-cli/issues/71)) ([cb6d60b](https://github.com/largeoliu/redmine-cli/commit/cb6d60b6a1c2416eac8b2f762914907a1c779208))
+* resolve master merge conflict for PR 53 ([ad66bc6](https://github.com/largeoliu/redmine-cli/commit/ad66bc661c033e2b44902952ad0f718a872e858b))
+
 ## [0.3.0](https://github.com/largeoliu/redmine-cli/compare/v0.2.5...v0.3.0) (2026-04-18)
 
 

@@ -558,12 +558,12 @@ func TestAuthenticationWithInvalidKey(t *testing.T) {
 func TestBuildListParams(t *testing.T) {
 	flags := issues.ListFlags{
 		ProjectID:    1,
-		TrackerID:    2,
-		StatusID:     3,
-		AssignedToID: 4,
+		TrackerID:    []int{2},
+		StatusID:     []int{3},
+		AssignedToID: []int{4},
 		Limit:        10,
 		Offset:       5,
-		Query:        "query123",
+		Query:        []string{"query123"},
 		Sort:         "created_on:desc",
 	}
 

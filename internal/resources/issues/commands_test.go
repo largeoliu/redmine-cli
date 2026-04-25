@@ -93,7 +93,7 @@ func TestListCommand_Success(t *testing.T) {
 	}
 
 	cmd := newListCommand(flags, resolver)
-	cmd.SetArgs([]string{})
+	cmd.SetArgs([]string{"--project-id", "1"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -130,7 +130,7 @@ func TestListCommand_TrackerNameFilter(t *testing.T) {
 	}
 
 	cmd := newListCommand(flags, resolver)
-	cmd.SetArgs([]string{"--tracker", "需求"})
+	cmd.SetArgs([]string{"--project-id", "1", "--tracker", "需求"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -160,9 +160,106 @@ func TestListCommand_TrackerAllSkipsLookup(t *testing.T) {
 	}
 
 	cmd := newListCommand(flags, resolver)
-	cmd.SetArgs([]string{"--tracker", "全部"})
+	cmd.SetArgs([]string{"--project-id", "1", "--tracker", "全部"})
 
 	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestListCommand_VersionIDFilter(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.Handle("/issues.json", func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Query().Get("fixed_version_id"); got != "123" {
+			t.Fatalf("expected fixed_version_id=123, got %s", r.URL.RawQuery)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(sampleIssueList())
+	})
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return nil
+		},
+	}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{"--project-id", "1", "--version-id", "123"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestListCommand_SprintIDFilter(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleJSON("/projects/1/agile_sprints.json", map[string]any{
+		"agile_sprints": []map[string]any{
+			{"id": 10, "name": "Sprint 10"},
+		},
+	})
+
+	mock.Handle("/issues.json", func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		if got := q.Get("set_filter"); got != "1" {
+			// Use Errorf so the handler still returns a response and the
+			// command doesn't retry/EOF in a loop.
+			t.Errorf("expected set_filter=1, got %q (raw query: %s)", got, r.URL.RawQuery)
+		}
+
+		// f[]=agile_sprints
+		filters, ok := q["f[]"]
+		if !ok {
+			t.Errorf("expected f[]=agile_sprints, got none (raw query: %s)", r.URL.RawQuery)
+		} else {
+			found := false
+			for _, v := range filters {
+				if v == "agile_sprints" {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expected f[]=agile_sprints, got %v (raw query: %s)", filters, r.URL.RawQuery)
+			}
+		}
+
+		// op[agile_sprints]== (equal operator)
+		if op, ok := q["op[agile_sprints]"]; !ok || len(op) == 0 || op[0] != "=" {
+			t.Errorf("expected op[agile_sprints]==, got %v (raw query: %s)", op, r.URL.RawQuery)
+		}
+
+		// v[agile_sprints][]=10
+		if got := q.Get("v[agile_sprints][]"); got != "10" {
+			t.Errorf("expected v[agile_sprints][]=10, got %q (raw query: %s)", got, r.URL.RawQuery)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(sampleIssueList())
+	})
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return nil
+		},
+	}
+
+	root := NewCommand(flags, resolver)
+	root.SetArgs([]string{"list", "--project-id", "1", "--sprint", "10"})
+
+	if err := root.Execute(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -176,7 +273,7 @@ func TestListCommand_ResolveClientError(t *testing.T) {
 	}
 
 	cmd := newListCommand(flags, resolver)
-	cmd.SetArgs([]string{})
+	cmd.SetArgs([]string{"--project-id", "1"})
 
 	err := cmd.Execute()
 	if err == nil {
@@ -271,6 +368,70 @@ func TestCreateCommand_Success(t *testing.T) {
 	}
 }
 
+func TestCreateCommand_VersionIDFlag(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.Handle("/issues.json", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("expected POST request, got %s", r.Method)
+		}
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		issue, ok := payload["issue"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected issue object in payload, got %T", payload["issue"])
+		}
+		if got := issue["fixed_version_id"]; got != float64(7) {
+			t.Fatalf("expected fixed_version_id=7, got %v", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(struct {
+			Issue Issue `json:"issue"`
+		}{Issue: Issue{ID: 1, Subject: "New Issue", Project: &Reference{ID: 1, Name: "Project A"}}})
+	})
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, _ any) error {
+			return nil
+		},
+	}
+
+	cmd := newCreateCommand(flags, resolver)
+	cmd.SetArgs([]string{
+		"--project-id", "1",
+		"--subject", "New Issue",
+		"--version-id", "7",
+	})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestCreateCommand_OldFixedVersionIDFlagRejected(t *testing.T) {
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{}
+
+	cmd := newCreateCommand(flags, resolver)
+	cmd.SetArgs([]string{
+		"--project-id", "1",
+		"--subject", "New Issue",
+		"--fixed-version-id", "7",
+	})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for removed --fixed-version-id flag, got nil")
+	}
+}
+
 func TestCreateCommand_MissingProjectID(t *testing.T) {
 	flags := &types.GlobalFlags{}
 	resolver := &mockResolver{}
@@ -339,6 +500,56 @@ func TestUpdateCommand_Success(t *testing.T) {
 	err := cmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateCommand_VersionIDFlag(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.Handle("/issues/1.json", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			t.Fatalf("expected PUT request, got %s", r.Method)
+		}
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		issue, ok := payload["issue"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected issue object in payload, got %T", payload["issue"])
+		}
+		if got := issue["fixed_version_id"]; got != float64(7) {
+			t.Fatalf("expected fixed_version_id=7, got %v", got)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+	}
+
+	cmd := newUpdateCommand(flags, resolver)
+	cmd.SetArgs([]string{"1", "--version-id", "7"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateCommand_OldFixedVersionIDFlagRejected(t *testing.T) {
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{}
+
+	cmd := newUpdateCommand(flags, resolver)
+	cmd.SetArgs([]string{"1", "--fixed-version-id", "7"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for removed --fixed-version-id flag, got nil")
 	}
 }
 
@@ -439,7 +650,7 @@ func TestListCommand_APIError(t *testing.T) {
 	}
 
 	cmd := newListCommand(flags, resolver)
-	cmd.SetArgs([]string{})
+	cmd.SetArgs([]string{"--project-id", "1"})
 
 	err := cmd.Execute()
 	if err == nil {
@@ -468,7 +679,7 @@ func TestListCommand_WithGlobalLimit(t *testing.T) {
 	}
 
 	cmd := newListCommand(flags, resolver)
-	cmd.SetArgs([]string{})
+	cmd.SetArgs([]string{"--project-id", "1"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -497,7 +708,7 @@ func TestListCommand_WithGlobalOffset(t *testing.T) {
 	}
 
 	cmd := newListCommand(flags, resolver)
-	cmd.SetArgs([]string{})
+	cmd.SetArgs([]string{"--project-id", "1"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -666,29 +877,39 @@ func TestDeleteCommand_ConfirmationWithYes(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	flags := &types.GlobalFlags{Yes: false}
-	resolver := &mockResolver{
-		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
-			return client.NewClient(mock.URL, "test-key"), nil
-		},
+	testCases := []struct {
+		name  string
+		input string
+	}{
+		{"lowercase y", "y\n"},
+		{"uppercase Y", "Y\n"},
 	}
 
-	// 模拟用户输入 'y'
-	input := "y\n"
-	r, w, _ := os.Pipe()
-	_, _ = w.WriteString(input)
-	w.Close()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			flags := &types.GlobalFlags{Yes: false}
+			resolver := &mockResolver{
+				resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+					return client.NewClient(mock.URL, "test-key"), nil
+				},
+			}
 
-	oldStdin := os.Stdin
-	defer func() { os.Stdin = oldStdin }()
-	os.Stdin = r
+			r, w, _ := os.Pipe()
+			_, _ = w.WriteString(tc.input)
+			w.Close()
 
-	cmd := newDeleteCommand(flags, resolver)
-	cmd.SetArgs([]string{"1"})
+			oldStdin := os.Stdin
+			defer func() { os.Stdin = oldStdin }()
+			os.Stdin = r
 
-	err := cmd.Execute()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+			cmd := newDeleteCommand(flags, resolver)
+			cmd.SetArgs([]string{"1"})
+
+			err := cmd.Execute()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
 	}
 }
 
