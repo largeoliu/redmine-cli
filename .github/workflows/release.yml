@@ -66,7 +66,7 @@ jobs:
           COMMIT="$(git rev-parse --short "$GITHUB_SHA")"
           DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           go build -ldflags "-X github.com/largeoliu/redmine-cli/internal/app.version=$VERSION -X github.com/largeoliu/redmine-cli/internal/app.commit=$COMMIT -X github.com/largeoliu/redmine-cli/internal/app.date=$DATE" -o bin/redmine ./cmd
-          OUT="$(./bin/redmine version)"
+          OUT="$(./bin/redmine info)"
           printf '%s\n' "$OUT"
           case "$OUT" in
             *"redmine version $VERSION"* ) ;;
