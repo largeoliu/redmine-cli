@@ -40,9 +40,6 @@
     "@commitlint/config-conventional": "^19.8.1",
     "husky": "^9.1.7"
   },
-  "overrides": {
-    "tar": ">=7.4.0"
-  },
   "files": [
     "bin",
     "scripts/download.js"
