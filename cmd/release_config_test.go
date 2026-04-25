@@ -127,52 +127,17 @@ func TestReleaseWorkflowMatchesConfiguredPublishTargets(t *testing.T) {
 	}
 }
 
-func TestPackageJSONDoesNotExposeLegacyPackageInstaller(t *testing.T) {
-	pkg := readJSONMap(t, filepath.Join("..", "package.json"))
-
-	scripts, ok := pkg["scripts"].(map[string]any)
-	if !ok {
-		t.Fatal("expected scripts object in package.json")
-	}
-
-	if _, exists := scripts["postinstall"]; exists {
-		t.Fatal("expected package.json to stop using postinstall download flow")
-	}
-
-	if deps, ok := pkg["dependencies"].(map[string]any); ok {
-		for _, dep := range []string{"tar", "unzipper"} {
-			if _, exists := deps[dep]; exists {
-				t.Fatalf("expected package.json to stop depending on %q for the legacy installer", dep)
-			}
-		}
-	}
-
-	if files, exists := pkg["files"]; exists {
-		list, ok := toStringSlice(files)
-		if !ok {
-			t.Fatal("expected package.json files field to stay a string array")
-		}
-		if slices.Contains(list, "scripts/download.js") || slices.Contains(list, "bin") {
-			t.Fatalf("expected package.json files to stop publishing legacy installer assets, got %v", list)
-		}
-	}
-
-	if _, exists := pkg["bin"]; exists {
-		t.Fatal("expected package.json to stop exposing an installed binary shim")
-	}
-}
-
-func TestPackageJSONDoesNotKeepInstallerSpecificOverrides(t *testing.T) {
-	pkg := readJSONMap(t, filepath.Join("..", "package.json"))
-
-	overrides, ok := pkg["overrides"].(map[string]any)
-	if !ok {
-		return
-	}
-
-	for _, name := range []string{"tar", "unzipper"} {
-		if _, exists := overrides[name]; exists {
-			t.Fatalf("expected package.json to drop legacy installer override %q", name)
+func TestRepositoryDoesNotKeepLegacyNodeTooling(t *testing.T) {
+	for _, path := range []string{
+		filepath.Join("..", "package.json"),
+		filepath.Join("..", "package-lock.json"),
+		filepath.Join("..", "commitlint.config.js"),
+		filepath.Join("..", ".husky", "commit-msg"),
+	} {
+		if _, err := os.Stat(path); err == nil {
+			t.Fatalf("expected %s to be removed with the legacy Node tooling", path)
+		} else if !os.IsNotExist(err) {
+			t.Fatalf("stat %s: %v", path, err)
 		}
 	}
 }

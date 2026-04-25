@@ -3,7 +3,6 @@
 ## 目的
 - 本仓库是一个 Go 语言编写的 Redmine CLI 工具，发布的二进制文件名为 `redmine`。
 - 代码主入口在 `cmd/`、`internal/` 和 `test/`。
-- `package.json` 仅用于 npm 分发和安装辅助脚本，不包含应用逻辑。
 
 ## 目录导航
 - `cmd/`：程序入口，`cmd/main.go` 仅调用 `app.Execute()`。
