@@ -28,15 +28,7 @@ curl -fsSL https://raw.githubusercontent.com/largeoliu/redmine-cli/master/script
 irm https://raw.githubusercontent.com/largeoliu/redmine-cli/master/scripts/install.ps1 | iex
 ```
 
-### 方式二：npm 安装
-
-```bash
-npm install -g redminectl
-```
-
-> **注意：** npm 包名为 `redminectl`，但安装后的命令为 `redmine`。
-
-### 方式三：手动下载
+### 方式二：手动下载
 
 1. 访问 [GitHub Releases](https://github.com/largeoliu/redmine-cli/releases) 页面
 2. 根据您的平台下载对应的压缩包：
@@ -51,7 +43,7 @@ npm install -g redminectl
    - Windows: 移动到 `C:\Windows\System32\` 或添加到 PATH 的目录
 5. macOS/Linux 用户需要添加可执行权限：`chmod +x /usr/local/bin/redmine`
 
-### 方式四：从源码构建
+### 方式三：从源码构建
 
 **前提条件：** 需要安装 Go 1.23 或更高版本。
 

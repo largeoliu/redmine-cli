@@ -115,49 +115,19 @@ func TestReleaseWorkflowMatchesConfiguredPublishTargets(t *testing.T) {
 	}
 
 	if _, exists := goreleaserStep.Env["NPM_TOKEN"]; exists {
-		t.Fatal("expected GoReleaser step to stop handling npm publishing")
+		t.Fatal("expected GoReleaser step to stop handling legacy package publishing")
 	}
 
 	if _, exists := goreleaserStep.Env["HOMEBREW_TAP_TOKEN"]; exists {
 		t.Fatal("expected Homebrew token to be removed from release workflow")
 	}
 
-	npmJob, ok := workflow.Jobs["npm-publish"]
-	if !ok {
-		t.Fatal("expected separate npm-publish job in release workflow")
-	}
-
-	setupNode := findStepByUses(t, npmJob, "actions/setup-node@")
-	registryURL, ok := setupNode.With["registry-url"].(string)
-	if !ok || registryURL == "" {
-		t.Fatal("expected npm-publish job to configure registry-url")
-	}
-	nodeVersion, ok := setupNode.With["node-version"].(string)
-	if !ok || nodeVersion == "" {
-		t.Fatal("expected npm-publish job to pin a Node version")
-	}
-	if nodeVersion != "24" {
-		t.Fatalf("expected npm-publish job to use Node 24 for npm trusted publishing compatibility, got %q", nodeVersion)
-	}
-
-	publishStep := findStepByName(t, npmJob, "Publish to npm")
-	if _, exists := publishStep.Env["NODE_AUTH_TOKEN"]; exists {
-		t.Fatal("expected npm publish step to avoid NODE_AUTH_TOKEN and rely on OIDC trusted publishing")
-	}
-
-	publishRun := findStepByName(t, npmJob, "Publish to npm")
-	if !strings.Contains(publishRun.Run, "--ignore-scripts") {
-		t.Fatalf("expected npm publish step to ignore lifecycle scripts, got %q", publishRun.Run)
-	}
-	if strings.Contains(publishRun.Run, "NODE_AUTH_TOKEN") {
-		t.Fatalf("expected npm publish step to avoid token-based auth, got %q", publishRun.Run)
-	}
-	if strings.Contains(publishRun.Run, "NPM_TOKEN") {
-		t.Fatalf("expected npm publish step to avoid legacy token-based auth, got %q", publishRun.Run)
+	if _, exists := workflow.Jobs["npm-publish"]; exists {
+		t.Fatal("expected release workflow to stop defining the legacy package publish job")
 	}
 }
 
-func TestNPMPackageUsesStandaloneInstaller(t *testing.T) {
+func TestPackageJSONDoesNotExposeLegacyPackageInstaller(t *testing.T) {
 	pkg := readJSONMap(t, filepath.Join("..", "package.json"))
 
 	scripts, ok := pkg["scripts"].(map[string]any)
@@ -165,59 +135,44 @@ func TestNPMPackageUsesStandaloneInstaller(t *testing.T) {
 		t.Fatal("expected scripts object in package.json")
 	}
 
-	if got := scripts["postinstall"]; got != "node scripts/download.js" {
-		t.Fatalf("expected package.json postinstall to run download.js, got %v", got)
+	if _, exists := scripts["postinstall"]; exists {
+		t.Fatal("expected package.json to stop using postinstall download flow")
 	}
 
-	deps, ok := pkg["dependencies"].(map[string]any)
-	if !ok {
-		t.Fatal("expected dependencies object in package.json")
-	}
-
-	for _, dep := range []string{"tar", "unzipper"} {
-		if _, exists := deps[dep]; !exists {
-			t.Fatalf("expected dependency %q for npm installer", dep)
+	if deps, ok := pkg["dependencies"].(map[string]any); ok {
+		for _, dep := range []string{"tar", "unzipper"} {
+			if _, exists := deps[dep]; exists {
+				t.Fatalf("expected package.json to stop depending on %q for the legacy installer", dep)
+			}
 		}
 	}
 
-	files, ok := toStringSlice(pkg["files"])
-	if !ok {
-		t.Fatal("expected files array in package.json")
-	}
-
-	if !slices.Contains(files, "scripts/download.js") {
-		t.Fatal("expected npm package files to include only the installer script")
-	}
-
-	if slices.Contains(files, "bin") {
-		t.Fatal("expected npm package files to avoid publishing an empty bin directory")
-	}
-
-	if slices.Contains(files, "scripts") {
-		t.Fatal("expected npm package files to avoid publishing unrelated scripts")
+	if files, exists := pkg["files"]; exists {
+		list, ok := toStringSlice(files)
+		if !ok {
+			t.Fatal("expected package.json files field to stay a string array")
+		}
+		if slices.Contains(list, "scripts/download.js") || slices.Contains(list, "bin") {
+			t.Fatalf("expected package.json files to stop publishing legacy installer assets, got %v", list)
+		}
 	}
 
 	if _, exists := pkg["bin"]; exists {
-		t.Fatal("expected npm package metadata to avoid bin entry because the binary is downloaded during postinstall")
+		t.Fatal("expected package.json to stop exposing an installed binary shim")
 	}
 }
 
-func TestNPMPackageOverridesDoNotConflictWithDirectDependencies(t *testing.T) {
+func TestPackageJSONDoesNotKeepInstallerSpecificOverrides(t *testing.T) {
 	pkg := readJSONMap(t, filepath.Join("..", "package.json"))
-
-	deps, ok := pkg["dependencies"].(map[string]any)
-	if !ok {
-		t.Fatal("expected dependencies object in package.json")
-	}
 
 	overrides, ok := pkg["overrides"].(map[string]any)
 	if !ok {
 		return
 	}
 
-	for name := range overrides {
-		if _, exists := deps[name]; exists {
-			t.Fatalf("expected package override %q to avoid conflicting with a direct dependency during npm publish", name)
+	for _, name := range []string{"tar", "unzipper"} {
+		if _, exists := overrides[name]; exists {
+			t.Fatalf("expected package.json to drop legacy installer override %q", name)
 		}
 	}
 }
@@ -293,14 +248,8 @@ func TestReleaseWorkflowHasPreflightGate(t *testing.T) {
 		t.Fatalf("expected goreleaser job to need preflight, got %v", goreleaserJob.Needs)
 	}
 
-	npmJob, ok := workflow.Jobs["npm-publish"]
-	if !ok {
-		t.Fatal("expected npm-publish job in release workflow")
-	}
-
-	npmNeeds, ok := toStringSliceOrString(npmJob.Needs)
-	if !ok || !slices.Contains(npmNeeds, "goreleaser") {
-		t.Fatalf("expected npm-publish job to need goreleaser, got %v", npmJob.Needs)
+	if _, exists := workflow.Jobs["npm-publish"]; exists {
+		t.Fatal("expected release workflow to stop after goreleaser without the legacy package publish job")
 	}
 }
 
