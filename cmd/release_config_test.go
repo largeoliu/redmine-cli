@@ -222,26 +222,6 @@ func TestNPMPackageOverridesDoNotConflictWithDirectDependencies(t *testing.T) {
 	}
 }
 
-func TestNPMPackageOverridesDoNotConflictWithDirectDependencies(t *testing.T) {
-	pkg := readJSONMap(t, filepath.Join("..", "package.json"))
-
-	deps, ok := pkg["dependencies"].(map[string]any)
-	if !ok {
-		t.Fatal("expected dependencies object in package.json")
-	}
-
-	overrides, ok := pkg["overrides"].(map[string]any)
-	if !ok {
-		return
-	}
-
-	for name := range overrides {
-		if _, exists := deps[name]; exists {
-			t.Fatalf("expected package override %q to avoid conflicting with a direct dependency during npm publish", name)
-		}
-	}
-}
-
 func TestGoReleaserLdflagsTargetInternalAppVariables(t *testing.T) {
 	config := readYAMLMap(t, filepath.Join("..", ".goreleaser.yml"))
 
