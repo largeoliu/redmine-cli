@@ -990,6 +990,178 @@ func TestDeleteCommand_ResolveClientError(t *testing.T) {
 	}
 }
 
+func TestGetCommand_WithAgileData(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	issueResponse := struct {
+		Issue Issue `json:"issue"`
+	}{
+		Issue: Issue{
+			ID:      1,
+			Subject: "Test Issue",
+			Project: &Reference{ID: 1, Name: "Project A"},
+		},
+	}
+	mock.HandleJSON("/issues/1.json", issueResponse)
+
+	agileResponse := struct {
+		AgileData struct {
+			AgileSprintID *int    `json:"agile_sprint_id,omitempty"`
+			StoryPoints   float64 `json:"story_points,omitempty"`
+			Position      int     `json:"position,omitempty"`
+		} `json:"agile_data"`
+	}{
+		AgileData: struct {
+			AgileSprintID *int    `json:"agile_sprint_id,omitempty"`
+			StoryPoints   float64 `json:"story_points,omitempty"`
+			Position      int     `json:"position,omitempty"`
+		}{
+			AgileSprintID: intPtr(7),
+			StoryPoints:   5,
+			Position:      12,
+		},
+	}
+	mock.HandleJSON("/issues/1/agile_data.json", agileResponse)
+
+	var capturedPayload any
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, payload any) error {
+			capturedPayload = payload
+			return nil
+		},
+	}
+
+	cmd := newGetCommand(flags, resolver)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	issue, ok := capturedPayload.(*Issue)
+	if !ok {
+		t.Fatalf("expected *Issue payload, got %T", capturedPayload)
+	}
+	if issue.StoryPoints != 5 {
+		t.Fatalf("expected story_points 5, got %v", issue.StoryPoints)
+	}
+	if issue.AgileSprintID == nil || *issue.AgileSprintID != 7 {
+		t.Fatalf("expected agile_sprint_id 7, got %v", issue.AgileSprintID)
+	}
+	if issue.Position != 12 {
+		t.Fatalf("expected position 12, got %v", issue.Position)
+	}
+}
+
+func TestGetCommand_AgileDataNotFound(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	issueResponse := struct {
+		Issue Issue `json:"issue"`
+	}{
+		Issue: Issue{
+			ID:      1,
+			Subject: "Test Issue",
+			Project: &Reference{ID: 1, Name: "Project A"},
+		},
+	}
+	mock.HandleJSON("/issues/1.json", issueResponse)
+	mock.HandleError("/issues/1/agile_data.json", http.StatusNotFound, "Not found")
+
+	var capturedPayload any
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, payload any) error {
+			capturedPayload = payload
+			return nil
+		},
+	}
+
+	cmd := newGetCommand(flags, resolver)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	issue, ok := capturedPayload.(*Issue)
+	if !ok {
+		t.Fatalf("expected *Issue payload, got %T", capturedPayload)
+	}
+	if issue.ID != 1 {
+		t.Fatalf("expected issue ID 1, got %d", issue.ID)
+	}
+	if issue.StoryPoints != 0 {
+		t.Fatalf("expected story_points 0 when agile data unavailable, got %v", issue.StoryPoints)
+	}
+	if issue.AgileSprintID != nil {
+		t.Fatalf("expected agile_sprint_id nil when agile data unavailable, got %v", issue.AgileSprintID)
+	}
+}
+
+func TestGetCommand_AgileDataServerError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	issueResponse := struct {
+		Issue Issue `json:"issue"`
+	}{
+		Issue: Issue{
+			ID:      1,
+			Subject: "Test Issue",
+			Project: &Reference{ID: 1, Name: "Project A"},
+		},
+	}
+	mock.HandleJSON("/issues/1.json", issueResponse)
+	mock.HandleError("/issues/1/agile_data.json", http.StatusInternalServerError, "Internal Server Error")
+
+	var capturedPayload any
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+		writeOutputFunc: func(_ io.Writer, _ *types.GlobalFlags, payload any) error {
+			capturedPayload = payload
+			return nil
+		},
+	}
+
+	cmd := newGetCommand(flags, resolver)
+	cmd.SetArgs([]string{"1"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	issue, ok := capturedPayload.(*Issue)
+	if !ok {
+		t.Fatalf("expected *Issue payload, got %T", capturedPayload)
+	}
+	if issue.ID != 1 {
+		t.Fatalf("expected issue ID 1, got %d", issue.ID)
+	}
+	if issue.StoryPoints != 0 {
+		t.Fatalf("expected story_points 0 when agile data unavailable, got %v", issue.StoryPoints)
+	}
+}
+
+func intPtr(v int) *int {
+	return &v
+}
+
 func TestDeleteCommand_APIError(t *testing.T) {
 	mock := testutil.NewMockServer(t)
 	defer mock.Close()
