@@ -918,6 +918,12 @@ func TestInvalidIDArgument(t *testing.T) {
 
 func TestIssueGetWithInclude(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/issues/1/agile_data.json" {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]any{"agile_data": map[string]any{}})
+			return
+		}
+
 		include := r.URL.Query().Get("include")
 
 		if include != "children,attachments" {

@@ -5,28 +5,31 @@ import "time"
 
 // Issue represents a Redmine issue.
 type Issue struct {
-	ID           int           `json:"id"`
-	Subject      string        `json:"subject"`
-	Description  string        `json:"description"`
-	Project      *Reference    `json:"project,omitempty"`
-	Tracker      *Reference    `json:"tracker,omitempty"`
-	Status       *Reference    `json:"status,omitempty"`
-	Priority     *Reference    `json:"priority,omitempty"`
-	Author       *Reference    `json:"author,omitempty"`
-	AssignedTo   *Reference    `json:"assigned_to,omitempty"`
-	Category     *Reference    `json:"category,omitempty"`
-	FixedVersion *Reference    `json:"fixed_version,omitempty"`
-	Parent       *Reference    `json:"parent,omitempty"`
-	StartDate    string        `json:"start_date,omitempty"`
-	DueDate      string        `json:"due_date,omitempty"`
-	DoneRatio    int           `json:"done_ratio"`
-	CreatedOn    *time.Time    `json:"created_on,omitempty"`
-	UpdatedOn    *time.Time    `json:"updated_on,omitempty"`
-	ClosedOn     *time.Time    `json:"closed_on,omitempty"`
-	Notes        string        `json:"notes,omitempty"`
-	PrivateNotes bool          `json:"private_notes"`
-	Watchers     []Reference   `json:"watchers,omitempty"`
-	CustomFields []CustomField `json:"custom_fields,omitempty"`
+	ID            int           `json:"id"`
+	Subject       string        `json:"subject"`
+	Description   string        `json:"description"`
+	Project       *Reference    `json:"project,omitempty"`
+	Tracker       *Reference    `json:"tracker,omitempty"`
+	Status        *Reference    `json:"status,omitempty"`
+	Priority      *Reference    `json:"priority,omitempty"`
+	Author        *Reference    `json:"author,omitempty"`
+	AssignedTo    *Reference    `json:"assigned_to,omitempty"`
+	Category      *Reference    `json:"category,omitempty"`
+	FixedVersion  *Reference    `json:"fixed_version,omitempty"`
+	Parent        *Reference    `json:"parent,omitempty"`
+	StartDate     string        `json:"start_date,omitempty"`
+	DueDate       string        `json:"due_date,omitempty"`
+	DoneRatio     int           `json:"done_ratio"`
+	CreatedOn     *time.Time    `json:"created_on,omitempty"`
+	UpdatedOn     *time.Time    `json:"updated_on,omitempty"`
+	ClosedOn      *time.Time    `json:"closed_on,omitempty"`
+	Notes         string        `json:"notes,omitempty"`
+	PrivateNotes  bool          `json:"private_notes"`
+	Watchers      []Reference   `json:"watchers,omitempty"`
+	CustomFields  []CustomField `json:"custom_fields,omitempty"`
+	AgileSprintID *int          `json:"agile_sprint_id,omitempty"`
+	StoryPoints   float64       `json:"story_points,omitempty"`
+	Position      int           `json:"position,omitempty"`
 }
 
 // Reference represents a reference to another Redmine entity.

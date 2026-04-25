@@ -14,6 +14,7 @@ import (
 
 	"github.com/largeoliu/redmine-cli/internal/client"
 	"github.com/largeoliu/redmine-cli/internal/errors"
+	agilepkg "github.com/largeoliu/redmine-cli/internal/resources/agile"
 	"github.com/largeoliu/redmine-cli/internal/resources/helpers"
 	"github.com/largeoliu/redmine-cli/internal/resources/trackers"
 	"github.com/largeoliu/redmine-cli/internal/types"
@@ -354,6 +355,11 @@ func newGetCommand(flags *types.GlobalFlags, resolver types.Resolver) *cobra.Com
 			result, err := NewClient(c).Get(cmd.Context(), id, params)
 			if err != nil {
 				return err
+			}
+			if agileData, agileErr := agilepkg.NewClient(c).GetIssueAgileData(cmd.Context(), id); agileErr == nil {
+				result.AgileSprintID = agileData.AgileSprintID
+				result.StoryPoints = agileData.StoryPoints
+				result.Position = agileData.Position
 			}
 			return resolver.WriteOutput(cmd.OutOrStdout(), flags, result)
 		},
