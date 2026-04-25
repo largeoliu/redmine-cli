@@ -3,9 +3,6 @@
   "version": "0.1.0",
   "description": "AI Agent friendly Redmine CLI tool. This npm package is named 'redminectl' because 'redmine' was already taken on npm. The installed binary is still 'redmine'.",
   "main": "index.js",
-  "bin": {
-    "redmine": "./bin/redmine"
-  },
   "scripts": {
     "postinstall": "node scripts/download.js",
     "prepare": "if [ -x node_modules/.bin/husky ]; then husky; fi",
@@ -41,7 +38,6 @@
     "husky": "^9.1.7"
   },
   "files": [
-    "bin",
     "scripts/download.js"
   ]
 }

@@ -132,15 +132,28 @@ func TestReleaseWorkflowMatchesConfiguredPublishTargets(t *testing.T) {
 	if !ok || registryURL == "" {
 		t.Fatal("expected npm-publish job to configure registry-url")
 	}
+	nodeVersion, ok := setupNode.With["node-version"].(string)
+	if !ok || nodeVersion == "" {
+		t.Fatal("expected npm-publish job to pin a Node version")
+	}
+	if nodeVersion != "24" {
+		t.Fatalf("expected npm-publish job to use Node 24 for npm trusted publishing compatibility, got %q", nodeVersion)
+	}
 
-	publishStep := findStepByUses(t, npmJob, "")
-	if _, exists := publishStep.Env["NODE_AUTH_TOKEN"]; !exists {
-		t.Fatal("expected npm publish step to use NODE_AUTH_TOKEN")
+	publishStep := findStepByName(t, npmJob, "Publish to npm")
+	if _, exists := publishStep.Env["NODE_AUTH_TOKEN"]; exists {
+		t.Fatal("expected npm publish step to avoid NODE_AUTH_TOKEN and rely on OIDC trusted publishing")
 	}
 
 	publishRun := findStepByName(t, npmJob, "Publish to npm")
 	if !strings.Contains(publishRun.Run, "--ignore-scripts") {
 		t.Fatalf("expected npm publish step to ignore lifecycle scripts, got %q", publishRun.Run)
+	}
+	if strings.Contains(publishRun.Run, "NODE_AUTH_TOKEN") {
+		t.Fatalf("expected npm publish step to avoid token-based auth, got %q", publishRun.Run)
+	}
+	if strings.Contains(publishRun.Run, "NPM_TOKEN") {
+		t.Fatalf("expected npm publish step to avoid legacy token-based auth, got %q", publishRun.Run)
 	}
 }
 
@@ -176,8 +189,16 @@ func TestNPMPackageUsesStandaloneInstaller(t *testing.T) {
 		t.Fatal("expected npm package files to include only the installer script")
 	}
 
+	if slices.Contains(files, "bin") {
+		t.Fatal("expected npm package files to avoid publishing an empty bin directory")
+	}
+
 	if slices.Contains(files, "scripts") {
 		t.Fatal("expected npm package files to avoid publishing unrelated scripts")
+	}
+
+	if _, exists := pkg["bin"]; exists {
+		t.Fatal("expected npm package metadata to avoid bin entry because the binary is downloaded during postinstall")
 	}
 }
 
