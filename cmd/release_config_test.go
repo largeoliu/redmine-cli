@@ -299,8 +299,8 @@ func TestReleaseWorkflowPreflightChecksTagLineageAndVersionMetadata(t *testing.T
 	if !strings.Contains(smokeStep.Run, "go build -ldflags") {
 		t.Fatalf("expected smoke step to build with ldflags, got %q", smokeStep.Run)
 	}
-	if !strings.Contains(smokeStep.Run, "./bin/redmine version") {
-		t.Fatalf("expected smoke step to run ./bin/redmine version, got %q", smokeStep.Run)
+	if !strings.Contains(smokeStep.Run, "./bin/redmine info") {
+		t.Fatalf("expected smoke step to run ./bin/redmine info, got %q", smokeStep.Run)
 	}
 }
 
