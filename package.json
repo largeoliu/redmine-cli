@@ -1,10 +1,8 @@
 {
-  "name": "redminectl",
-  "version": "0.1.0",
-  "description": "AI Agent friendly Redmine CLI tool. This npm package is named 'redminectl' because 'redmine' was already taken on npm. The installed binary is still 'redmine'.",
-  "main": "index.js",
+  "name": "redmine-cli-dev",
+  "private": true,
+  "description": "Repository-local Node tooling for redmine-cli.",
   "scripts": {
-    "postinstall": "node scripts/download.js",
     "prepare": "if [ -x node_modules/.bin/husky ]; then husky; fi",
     "lint:commit": "commitlint --from=HEAD~1 --to=HEAD"
   },
@@ -28,16 +26,9 @@
   "engines": {
     "node": ">=18"
   },
-  "dependencies": {
-    "tar": "^7.5.13",
-    "unzipper": "^0.12.3"
-  },
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
     "husky": "^9.1.7"
-  },
-  "files": [
-    "scripts/download.js"
-  ]
+  }
 }
