@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"slices"
@@ -343,22 +342,6 @@ func readWorkflow(t *testing.T, path string) workflowConfig {
 	}
 
 	return workflow
-}
-
-func readJSONMap(t *testing.T, path string) map[string]any {
-	t.Helper()
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read %s: %v", path, err)
-	}
-
-	var cfg map[string]any
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		t.Fatalf("unmarshal %s: %v", path, err)
-	}
-
-	return cfg
 }
 
 func findStepByUses(t *testing.T, job workflowJob, prefix string) workflowStep {
