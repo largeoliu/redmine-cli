@@ -668,6 +668,12 @@ func TestCategoryGetByProject(t *testing.T) {
 
 func TestIssueWatcherFields(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/issues/1/agile_data.json" {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]any{"agile_data": map[string]any{}})
+			return
+		}
+
 		query := r.URL.Query()
 		include := query.Get("include")
 
