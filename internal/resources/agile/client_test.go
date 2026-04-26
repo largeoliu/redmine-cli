@@ -184,6 +184,120 @@ func TestClient_ListSprintsNotFound(t *testing.T) {
 	}
 }
 
+func TestClient_GetSprintNotFound(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleError("/projects/42/agile_sprints/7.json", http.StatusNotFound, "Not found")
+
+	c := client.NewClient(mock.URL, "test-key")
+	agileClient := NewClient(c)
+
+	_, err := agileClient.GetSprint(context.Background(), 42, 7)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestClient_GetIssueAgileDataNotFound(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleError("/issues/9/agile_data.json", http.StatusNotFound, "Not found")
+
+	c := client.NewClient(mock.URL, "test-key")
+	agileClient := NewClient(c)
+
+	_, err := agileClient.GetIssueAgileData(context.Background(), 9)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
 func intPtr(v int) *int {
 	return &v
+}
+
+func TestSprintList_UnmarshalJSON(t *testing.T) {
+	tests := []struct {
+		name       string
+		data       []byte
+		wantErr    bool
+		verifyFunc func(t *testing.T, list *SprintList)
+	}{
+		{
+			name:    "invalid JSON",
+			data:    []byte(`not valid json`),
+			wantErr: true,
+		},
+		{
+			name:    "no sprints or agile_sprints field",
+			data:    []byte(`{"total_count": 0, "limit": 25, "offset": 0}`),
+			wantErr: false,
+			verifyFunc: func(t *testing.T, list *SprintList) {
+				if len(list.AgileSprints) != 0 {
+					t.Errorf("expected 0 sprints, got %d", len(list.AgileSprints))
+				}
+			},
+		},
+		{
+			name:    "invalid agile_sprints format",
+			data:    []byte(`{"agile_sprints": "not an array"}`),
+			wantErr: true,
+		},
+		{
+			name:    "invalid sprints format",
+			data:    []byte(`{"sprints": "not an array"}`),
+			wantErr: true,
+		},
+		{
+			name:    "invalid total_count format",
+			data:    []byte(`{"agile_sprints": [], "total_count": "not a number"}`),
+			wantErr: true,
+		},
+		{
+			name:    "invalid limit format",
+			data:    []byte(`{"agile_sprints": [], "total_count": 0, "limit": "not a number"}`),
+			wantErr: true,
+		},
+		{
+			name:    "invalid offset format",
+			data:    []byte(`{"agile_sprints": [], "total_count": 0, "limit": 25, "offset": "not a number"}`),
+			wantErr: true,
+		},
+		{
+			name:    "with all metadata fields",
+			data:    []byte(`{"agile_sprints": [{"id": 1, "name": "Sprint 1"}], "total_count": 100, "limit": 25, "offset": 50}`),
+			wantErr: false,
+			verifyFunc: func(t *testing.T, list *SprintList) {
+				if len(list.AgileSprints) != 1 {
+					t.Errorf("expected 1 sprint, got %d", len(list.AgileSprints))
+				}
+				if list.TotalCount != 100 {
+					t.Errorf("expected total_count 100, got %d", list.TotalCount)
+				}
+				if list.Limit != 25 {
+					t.Errorf("expected limit 25, got %d", list.Limit)
+				}
+				if list.Offset != 50 {
+					t.Errorf("expected offset 50, got %d", list.Offset)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var list SprintList
+			err := list.UnmarshalJSON(tt.data)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if !tt.wantErr && tt.verifyFunc != nil {
+				tt.verifyFunc(t, &list)
+			}
+		})
+	}
 }

@@ -3,6 +3,7 @@ package sprints
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"testing"
@@ -200,6 +201,182 @@ func TestGetCommand_MissingProjectID(t *testing.T) {
 	err := cmd.Execute()
 	if err == nil {
 		t.Fatal("expected error when --project-id is missing")
+	}
+}
+
+func TestEnrichSprintStatus(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []agile.Sprint
+		expected []agile.Sprint
+	}{
+		{
+			name: "已有 status 字段则不修改",
+			input: []agile.Sprint{
+				{ID: 1, Status: "active"},
+			},
+			expected: []agile.Sprint{
+				{ID: 1, Status: "active"},
+			},
+		},
+		{
+			name: "IsClosed 为 true 则 status 设为 closed",
+			input: []agile.Sprint{
+				{ID: 1, IsClosed: true},
+			},
+			expected: []agile.Sprint{
+				{ID: 1, IsClosed: true, Status: "closed"},
+			},
+		},
+		{
+			name: "IsArchived 为 true 则 status 设为 archived",
+			input: []agile.Sprint{
+				{ID: 1, IsArchived: true},
+			},
+			expected: []agile.Sprint{
+				{ID: 1, IsArchived: true, Status: "archived"},
+			},
+		},
+		{
+			name: "当前日期在 sprint 期间则为 active",
+			input: []agile.Sprint{
+				{ID: 1, StartDate: "2026-04-01", EndDate: "2026-04-30"},
+			},
+			expected: []agile.Sprint{
+				{ID: 1, StartDate: "2026-04-01", EndDate: "2026-04-30", Status: "active"},
+			},
+		},
+		{
+			name: "当前日期已过 sprint 结束日期则为 closed",
+			input: []agile.Sprint{
+				{ID: 1, StartDate: "2026-03-01", EndDate: "2026-03-31"},
+			},
+			expected: []agile.Sprint{
+				{ID: 1, StartDate: "2026-03-01", EndDate: "2026-03-31", Status: "closed"},
+			},
+		},
+		{
+			name: "当前日期未到 sprint 开始日期则为 open",
+			input: []agile.Sprint{
+				{ID: 1, StartDate: "2026-05-01", EndDate: "2026-05-31"},
+			},
+			expected: []agile.Sprint{
+				{ID: 1, StartDate: "2026-05-01", EndDate: "2026-05-31", Status: "open"},
+			},
+		},
+		{
+			name: "日期格式错误则默认设为 open",
+			input: []agile.Sprint{
+				{ID: 1, StartDate: "invalid", EndDate: "invalid"},
+			},
+			expected: []agile.Sprint{
+				{ID: 1, StartDate: "invalid", EndDate: "invalid", Status: "open"},
+			},
+		},
+		{
+			name: "只有 start_date 没有 end_date 则默认设为 open",
+			input: []agile.Sprint{
+				{ID: 1, StartDate: "2026-04-01"},
+			},
+			expected: []agile.Sprint{
+				{ID: 1, StartDate: "2026-04-01", Status: "open"},
+			},
+		},
+		{
+			name: "多个 sprint 的情况",
+			input: []agile.Sprint{
+				{ID: 1, IsClosed: true},
+				{ID: 2, IsArchived: true},
+				{ID: 3, StartDate: "2026-04-01", EndDate: "2026-04-30"},
+			},
+			expected: []agile.Sprint{
+				{ID: 1, IsClosed: true, Status: "closed"},
+				{ID: 2, IsArchived: true, Status: "archived"},
+				{ID: 3, StartDate: "2026-04-01", EndDate: "2026-04-30", Status: "active"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := enrichSprintStatus(tt.input)
+			if len(result) != len(tt.expected) {
+				t.Fatalf("expected %d sprints, got %d", len(tt.expected), len(result))
+			}
+			for i := range result {
+				if result[i].Status != tt.expected[i].Status {
+					t.Errorf("sprint %d: expected status %q, got %q", i+1, tt.expected[i].Status, result[i].Status)
+				}
+			}
+		})
+	}
+}
+
+func TestListCommand_MissingProject(t *testing.T) {
+	flags := &types.GlobalFlags{Format: "json"}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) { return nil, nil },
+	}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when --project is missing")
+	}
+}
+
+func TestGetCommand_InvalidSprintID(t *testing.T) {
+	flags := &types.GlobalFlags{Format: "json"}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) { return nil, nil },
+	}
+
+	cmd := newGetCommand(flags, resolver)
+	cmd.SetArgs([]string{"--project-id", "42", "invalid-id"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when sprint_id is invalid")
+	}
+}
+
+func TestListCommand_ResolveClientError(t *testing.T) {
+	flags := &types.GlobalFlags{Format: "json"}
+	resolveErr := errors.New("resolve client failed")
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) { return nil, resolveErr },
+	}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{"--project", "42"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when resolve client fails")
+	}
+	if err != resolveErr {
+		t.Errorf("expected error %q, got %q", resolveErr, err)
+	}
+}
+
+func TestGetCommand_ResolveClientError(t *testing.T) {
+	flags := &types.GlobalFlags{Format: "json"}
+	resolveErr := errors.New("resolve client failed")
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) { return nil, resolveErr },
+	}
+
+	cmd := newGetCommand(flags, resolver)
+	cmd.SetArgs([]string{"--project-id", "42", "7"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when resolve client fails")
+	}
+	if err != resolveErr {
+		t.Errorf("expected error %q, got %q", resolveErr, err)
 	}
 }
 

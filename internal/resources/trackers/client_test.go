@@ -246,3 +246,89 @@ func TestClient_Get_Unauthorized(t *testing.T) {
 		t.Error("expected error, got nil")
 	}
 }
+
+func TestClient_FindByName_Success(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := TrackerList{
+		Trackers: []Tracker{
+			{ID: 1, Name: "Bug"},
+			{ID: 2, Name: "Feature"},
+			{ID: 3, Name: "Support"},
+		},
+	}
+	mock.HandleJSON("/trackers.json", response)
+
+	c := client.NewClient(mock.URL, "test-key")
+	trackerClient := NewClient(c)
+
+	result, err := trackerClient.FindByName(context.Background(), "Feature")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result.Name != "Feature" {
+		t.Errorf("expected name 'Feature', got %s", result.Name)
+	}
+}
+
+func TestClient_FindByName_TrimSpace(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := TrackerList{
+		Trackers: []Tracker{
+			{ID: 1, Name: "Bug"},
+		},
+	}
+	mock.HandleJSON("/trackers.json", response)
+
+	c := client.NewClient(mock.URL, "test-key")
+	trackerClient := NewClient(c)
+
+	result, err := trackerClient.FindByName(context.Background(), "  Bug  ")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result.Name != "Bug" {
+		t.Errorf("expected name 'Bug', got %s", result.Name)
+	}
+}
+
+func TestClient_FindByName_NotFound(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := TrackerList{
+		Trackers: []Tracker{
+			{ID: 1, Name: "Bug"},
+			{ID: 2, Name: "Feature"},
+		},
+	}
+	mock.HandleJSON("/trackers.json", response)
+
+	c := client.NewClient(mock.URL, "test-key")
+	trackerClient := NewClient(c)
+
+	_, err := trackerClient.FindByName(context.Background(), "Nonexistent")
+	if err == nil {
+		t.Error("expected error, got nil")
+	}
+}
+
+func TestClient_FindByName_ListError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleError("/trackers.json", http.StatusInternalServerError, "Internal Server Error")
+
+	c := client.NewClient(mock.URL, "test-key")
+	trackerClient := NewClient(c)
+
+	_, err := trackerClient.FindByName(context.Background(), "Bug")
+	if err == nil {
+		t.Error("expected error, got nil")
+	}
+}
