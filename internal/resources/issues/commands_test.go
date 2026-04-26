@@ -1186,15 +1186,12 @@ func TestDeleteCommand_APIError(t *testing.T) {
 
 func TestResolveSprintID(t *testing.T) {
 	ctx := context.Background()
-	mock := testutil.NewMockServer(t)
-	defer mock.Close()
-	c := client.NewClient(mock.URL, "test-key")
 
 	tests := []struct {
 		name      string
 		selector  string
 		projectID int
-		setupMock func()
+		setupMock func(mock *testutil.MockServer)
 		wantID    int
 		wantErr   bool
 	}{
@@ -1202,7 +1199,7 @@ func TestResolveSprintID(t *testing.T) {
 			name:      "empty selector",
 			selector:  "",
 			projectID: 1,
-			setupMock: func() {},
+			setupMock: func(mock *testutil.MockServer) {},
 			wantID:    0,
 			wantErr:   false,
 		},
@@ -1210,7 +1207,7 @@ func TestResolveSprintID(t *testing.T) {
 			name:      "valid numeric ID",
 			selector:  "123",
 			projectID: 1,
-			setupMock: func() {},
+			setupMock: func(mock *testutil.MockServer) {},
 			wantID:    123,
 			wantErr:   false,
 		},
@@ -1218,7 +1215,7 @@ func TestResolveSprintID(t *testing.T) {
 			name:      "zero ID",
 			selector:  "0",
 			projectID: 1,
-			setupMock: func() {},
+			setupMock: func(mock *testutil.MockServer) {},
 			wantID:    0,
 			wantErr:   true,
 		},
@@ -1226,7 +1223,7 @@ func TestResolveSprintID(t *testing.T) {
 			name:      "negative ID",
 			selector:  "-5",
 			projectID: 1,
-			setupMock: func() {},
+			setupMock: func(mock *testutil.MockServer) {},
 			wantID:    0,
 			wantErr:   true,
 		},
@@ -1234,7 +1231,7 @@ func TestResolveSprintID(t *testing.T) {
 			name:      "API error when fetching sprints",
 			selector:  "Sprint A",
 			projectID: 1,
-			setupMock: func() {
+			setupMock: func(mock *testutil.MockServer) {
 				mock.HandleError("/projects/1/agile_sprints.json", http.StatusInternalServerError, "Server Error")
 			},
 			wantID:  0,
@@ -1244,7 +1241,7 @@ func TestResolveSprintID(t *testing.T) {
 			name:      "sprint not found",
 			selector:  "Non-existent Sprint",
 			projectID: 1,
-			setupMock: func() {
+			setupMock: func(mock *testutil.MockServer) {
 				mock.HandleJSON("/projects/1/agile_sprints.json", map[string]any{
 					"agile_sprints": []map[string]any{
 						{"id": 1, "name": "Sprint 1"},
@@ -1259,7 +1256,7 @@ func TestResolveSprintID(t *testing.T) {
 			name:      "sprint found by name",
 			selector:  "Sprint 10",
 			projectID: 1,
-			setupMock: func() {
+			setupMock: func(mock *testutil.MockServer) {
 				mock.HandleJSON("/projects/1/agile_sprints.json", map[string]any{
 					"agile_sprints": []map[string]any{
 						{"id": 10, "name": "Sprint 10"},
@@ -1273,7 +1270,7 @@ func TestResolveSprintID(t *testing.T) {
 			name:      "multiple sprints with same name",
 			selector:  "Duplicate Sprint",
 			projectID: 1,
-			setupMock: func() {
+			setupMock: func(mock *testutil.MockServer) {
 				mock.HandleJSON("/projects/1/agile_sprints.json", map[string]any{
 					"agile_sprints": []map[string]any{
 						{"id": 5, "name": "Duplicate Sprint"},
@@ -1288,7 +1285,10 @@ func TestResolveSprintID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.setupMock()
+			mock := testutil.NewMockServer(t)
+			defer mock.Close()
+			c := client.NewClient(mock.URL, "test-key")
+			tt.setupMock(mock)
 
 			gotID, gotErr := resolveSprintID(ctx, c, tt.projectID, tt.selector)
 
