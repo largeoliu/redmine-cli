@@ -1183,3 +1183,124 @@ func TestDeleteCommand_APIError(t *testing.T) {
 		t.Error("expected error from API, got nil")
 	}
 }
+
+func TestResolveSprintID(t *testing.T) {
+	ctx := context.Background()
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+	c := client.NewClient(mock.URL, "test-key")
+
+	tests := []struct {
+		name      string
+		selector  string
+		projectID int
+		setupMock func()
+		wantID    int
+		wantErr   bool
+	}{
+		{
+			name:      "empty selector",
+			selector:  "",
+			projectID: 1,
+			setupMock: func() {},
+			wantID:    0,
+			wantErr:   false,
+		},
+		{
+			name:      "valid numeric ID",
+			selector:  "123",
+			projectID: 1,
+			setupMock: func() {},
+			wantID:    123,
+			wantErr:   false,
+		},
+		{
+			name:      "zero ID",
+			selector:  "0",
+			projectID: 1,
+			setupMock: func() {},
+			wantID:    0,
+			wantErr:   true,
+		},
+		{
+			name:      "negative ID",
+			selector:  "-5",
+			projectID: 1,
+			setupMock: func() {},
+			wantID:    0,
+			wantErr:   true,
+		},
+		{
+			name:      "API error when fetching sprints",
+			selector:  "Sprint A",
+			projectID: 1,
+			setupMock: func() {
+				mock.HandleError("/projects/1/agile_sprints.json", http.StatusInternalServerError, "Server Error")
+			},
+			wantID:  0,
+			wantErr: true,
+		},
+		{
+			name:      "sprint not found",
+			selector:  "Non-existent Sprint",
+			projectID: 1,
+			setupMock: func() {
+				mock.HandleJSON("/projects/1/agile_sprints.json", map[string]any{
+					"agile_sprints": []map[string]any{
+						{"id": 1, "name": "Sprint 1"},
+						{"id": 2, "name": "Sprint 2"},
+					},
+				})
+			},
+			wantID:  0,
+			wantErr: true,
+		},
+		{
+			name:      "sprint found by name",
+			selector:  "Sprint 10",
+			projectID: 1,
+			setupMock: func() {
+				mock.HandleJSON("/projects/1/agile_sprints.json", map[string]any{
+					"agile_sprints": []map[string]any{
+						{"id": 10, "name": "Sprint 10"},
+					},
+				})
+			},
+			wantID:  10,
+			wantErr: false,
+		},
+		{
+			name:      "multiple sprints with same name",
+			selector:  "Duplicate Sprint",
+			projectID: 1,
+			setupMock: func() {
+				mock.HandleJSON("/projects/1/agile_sprints.json", map[string]any{
+					"agile_sprints": []map[string]any{
+						{"id": 5, "name": "Duplicate Sprint"},
+						{"id": 6, "name": "Duplicate Sprint"},
+					},
+				})
+			},
+			wantID:  0,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setupMock()
+
+			gotID, gotErr := resolveSprintID(ctx, c, tt.projectID, tt.selector)
+
+			if gotErr != nil && !tt.wantErr {
+				t.Errorf("resolveSprintID() unexpected error: %v", gotErr)
+			} else if gotErr == nil && tt.wantErr {
+				t.Error("resolveSprintID() expected error, got nil")
+			}
+
+			if gotID != tt.wantID {
+				t.Errorf("resolveSprintID() gotID = %v, want %v", gotID, tt.wantID)
+			}
+		})
+	}
+}

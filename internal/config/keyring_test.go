@@ -62,7 +62,22 @@ func TestFallbackKeyring(t *testing.T) {
 
 func TestStoreWithKeyring(t *testing.T) {
 	dir := t.TempDir()
-	store := NewStore(dir)
+	var capturedName, capturedKey string
+	kr := &mockKeyring{
+		isAvailableFn: func() bool { return true },
+		setFunc: func(instanceName, apiKey string) error {
+			capturedName = instanceName
+			capturedKey = apiKey
+			return nil
+		},
+		getFunc: func(instanceName string) (string, error) {
+			if instanceName == "test-instance" {
+				return "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4", nil
+			}
+			return "", ErrAPIKeyNotFound
+		},
+	}
+	store := NewStoreWithKeyring(dir, kr)
 
 	instanceName := "test-instance"
 	apiKey := "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
@@ -90,6 +105,13 @@ func TestStoreWithKeyring(t *testing.T) {
 		t.Errorf("expected API key %s, got %s", apiKey, loadedInst.APIKey)
 	}
 
+	if capturedName != "test-instance" {
+		t.Errorf("keyring.Set name = %s, want test-instance", capturedName)
+	}
+	if capturedKey != apiKey {
+		t.Errorf("keyring.Set key = %s, want %s", capturedKey, apiKey)
+	}
+
 	configPath := filepath.Join(dir, "config.yaml")
 	//nolint:gosec // Test code reading from test directory
 	configData, err := os.ReadFile(configPath)
@@ -102,16 +124,8 @@ func TestStoreWithKeyring(t *testing.T) {
 		t.Fatalf("unmarshal config failed: %v", err)
 	}
 
-	// If keyring is available, API key should be in keyring (empty in file)
-	// If keyring is not available, API key should be in config file
-	if store.keyring.IsAvailable() {
-		if fileCfg.Instances[instanceName].APIKey != "" {
-			t.Errorf("API key should be empty in config file when keyring is available, got %s", fileCfg.Instances[instanceName].APIKey)
-		}
-	} else {
-		if fileCfg.Instances[instanceName].APIKey != apiKey {
-			t.Errorf("API key should be saved in config file when keyring is not available, got %s", fileCfg.Instances[instanceName].APIKey)
-		}
+	if fileCfg.Instances[instanceName].APIKey != "" {
+		t.Errorf("API key should be empty in config file when keyring is available, got %s", fileCfg.Instances[instanceName].APIKey)
 	}
 }
 
