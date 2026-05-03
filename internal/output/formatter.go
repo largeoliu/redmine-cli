@@ -29,6 +29,15 @@ func Write(w io.Writer, format Format, payload any) error {
 	case FormatJSON:
 		return WriteJSON(w, payload)
 	case FormatTable:
+		if _, ok := payload.([]any); !ok {
+			if _, ok := payload.(map[string]any); !ok {
+				normalized, err := normalizePayload(payload)
+				if err != nil {
+					return err
+				}
+				return WriteTable(w, normalized)
+			}
+		}
 		return WriteTable(w, payload)
 	case FormatRaw:
 		return WriteRaw(w, payload)
