@@ -176,10 +176,10 @@ func TestSelectFieldsErrors(t *testing.T) {
 			payload: []int{1, 2, 3},
 			fields:  []string{"id"},
 			check: func(t *testing.T, result any) {
-				// 非 map 数据应该返回原始数据
-				slice, ok := result.([]int)
+				// 非 map 数据会经过 marshal/unmarshal，返回 []any
+				slice, ok := result.([]any)
 				if !ok {
-					t.Error("expected slice result")
+					t.Errorf("expected []any result, got %T", result)
 					return
 				}
 				if len(slice) != 3 {
