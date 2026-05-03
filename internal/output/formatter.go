@@ -31,7 +31,7 @@ func Write(w io.Writer, format Format, payload any) error {
 	case FormatTable:
 		if _, ok := payload.([]any); !ok {
 			if _, ok := payload.(map[string]any); !ok {
-				normalized, err := normalizePayload(payload)
+				normalized, err := NormalizePayload(payload)
 				if err != nil {
 					return err
 				}
@@ -72,7 +72,7 @@ func WriteRaw(w io.Writer, payload any) error {
 
 // WriteTable writes data in table format.
 func WriteTable(w io.Writer, payload any) error {
-	normalized, err := normalizePayload(payload)
+	normalized, err := NormalizePayload(payload)
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,8 @@ func WriteTable(w io.Writer, payload any) error {
 	}
 }
 
-func normalizePayload(payload any) (any, error) {
+// NormalizePayload normalizes the payload by converting it to JSON and back.
+func NormalizePayload(payload any) (any, error) {
 	if payload == nil {
 		return nil, nil
 	}
@@ -104,6 +105,10 @@ func normalizePayload(payload any) (any, error) {
 		return nil, errors.NewInternal("failed to decode normalized payload")
 	}
 	return normalized, nil
+}
+
+func normalizePayload(payload any) (any, error) {
+	return NormalizePayload(payload)
 }
 
 func writeKeyValues(w io.Writer, payload map[string]any) error {
