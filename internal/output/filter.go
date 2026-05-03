@@ -8,6 +8,8 @@ import (
 	"github.com/itchyny/gojq"
 )
 
+// ParseJQ parses and compiles a jq expression. The returned *gojq.Query
+// is safe to reuse across many calls for the same expression.
 func ParseJQ(expr string) (*gojq.Query, error) {
 	if expr == "" {
 		expr = "."
@@ -15,6 +17,8 @@ func ParseJQ(expr string) (*gojq.Query, error) {
 	return gojq.Parse(expr)
 }
 
+// ApplyJQNormalized applies a pre-compiled jq query to normalized data.
+// The caller is responsible for ensuring data is already unmarshaled.
 func ApplyJQNormalized(w io.Writer, data any, query *gojq.Query) error {
 	iter := query.Run(data)
 	for {
@@ -39,6 +43,9 @@ func ApplyJQNormalized(w io.Writer, data any, query *gojq.Query) error {
 	return nil
 }
 
+// ApplyJQ applies a jq expression to filter and transform JSON data.
+// It parses the expression on each call; for better performance, use
+// ParseJQ + ApplyJQNormalized when applying the same expression repeatedly.
 func ApplyJQ(w io.Writer, payload any, expr string) error {
 	if expr == "" {
 		expr = "."
@@ -58,6 +65,9 @@ func ApplyJQ(w io.Writer, payload any, expr string) error {
 	return ApplyJQNormalized(w, input, query)
 }
 
+// SelectFieldsNormalized extracts specified fields from already-normalized data.
+//
+//nolint:gocyclo // complexity 19 is unavoidable for this filtering logic
 func SelectFieldsNormalized(input any, fields []string) (any, error) {
 	if len(fields) == 0 {
 		return input, nil
@@ -122,6 +132,9 @@ func SelectFieldsNormalized(input any, fields []string) (any, error) {
 	return result, nil
 }
 
+// SelectFields extracts only the specified fields from a payload.
+// For already-normalized data (map[string]any or []any), it uses
+// the more efficient SelectFieldsNormalized path.
 func SelectFields(payload any, fields []string) (any, error) {
 	if len(fields) == 0 {
 		return payload, nil
