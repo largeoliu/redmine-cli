@@ -918,3 +918,24 @@ func TestRealKeyringDeleteNonExistentWithMock(t *testing.T) {
 		t.Errorf("expected ErrAPIKeyNotFound for non-existent key, got %v", err)
 	}
 }
+
+func TestRealKeyringIsAvailableGetErrorPath(t *testing.T) {
+	origSet := keyringOps.Set
+	origGet := keyringOps.Get
+	origDelete := keyringOps.Delete
+	defer func() {
+		keyringOps.Set = origSet
+		keyringOps.Get = origGet
+		keyringOps.Delete = origDelete
+	}()
+
+	keyringOps.Set = func(service, k, secret string) error { return nil }
+	getErr := errors.New("keyring get failed")
+	keyringOps.Get = func(service, k string) (string, error) { return "", getErr }
+	keyringOps.Delete = func(service, k string) error { return nil }
+
+	kr := &realKeyring{}
+	if kr.IsAvailable() {
+		t.Error("expected IsAvailable to return false when Get fails")
+	}
+}

@@ -118,22 +118,26 @@ func promptInput(reader *bufio.Reader, _ string, defaultValue string) string {
 	return input
 }
 
+var termMakeRaw = term.MakeRaw
+var termReadPassword = term.ReadPassword
+var termRestore = term.Restore
+
 func promptSecret(reader *bufio.Reader, prompt string) string {
 	if prompt != "" {
 		fmt.Print(prompt + ": ")
 	}
 
 	fd := int(os.Stdin.Fd()) //nolint:gosec
-	oldState, err := term.MakeRaw(fd)
+	oldState, err := termMakeRaw(fd)
 	if err != nil {
 		input, _ := reader.ReadString('\n') //nolint:errcheck
 		return strings.TrimSpace(input)
 	}
 	defer func() {
-		_ = term.Restore(fd, oldState) //nolint:errcheck
+		_ = termRestore(fd, oldState) //nolint:errcheck
 	}()
 
-	input, err := term.ReadPassword(fd)
+	input, err := termReadPassword(fd)
 	fmt.Println()
 	if err != nil {
 		return ""

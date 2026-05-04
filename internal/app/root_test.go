@@ -966,3 +966,23 @@ func TestParseFieldsEdgeCases(t *testing.T) {
 		})
 	}
 }
+
+func TestWriteOutputSelectFieldsNormalizeError(t *testing.T) {
+	flags := &GlobalFlags{
+		Format: "json",
+		Fields: "id,name",
+	}
+
+	type unnormalizable struct {
+		Func func()
+	}
+	payload := &unnormalizable{
+		Func: func() {},
+	}
+
+	var buf bytes.Buffer
+	err := WriteOutput(&buf, flags, payload)
+	if err == nil {
+		t.Error("expected error from NormalizePayload for func field, got nil")
+	}
+}

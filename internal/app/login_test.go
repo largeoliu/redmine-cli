@@ -5,6 +5,8 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +14,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"golang.org/x/term"
 )
 
 func TestNewLoginCommand(t *testing.T) {
@@ -1426,6 +1430,78 @@ instances:
 
 	if err == nil {
 		t.Error("expected error for set default failure, got nil")
+	}
+}
+
+func TestPromptSecretMakeRawError(t *testing.T) {
+	orig := termMakeRaw
+	termMakeRaw = func(fd int) (*term.State, error) {
+		return nil, fmt.Errorf("term make raw error")
+	}
+	defer func() { termMakeRaw = orig }()
+
+	input := "fallback-secret\n"
+	reader := bufio.NewReader(strings.NewReader(input))
+	result := promptSecret(reader, "API Key")
+
+	if result != "fallback-secret" {
+		t.Errorf("expected 'fallback-secret', got %q", result)
+	}
+}
+
+func TestPromptSecretReadPasswordError(t *testing.T) {
+	origMakeRaw := termMakeRaw
+	origReadPassword := termReadPassword
+	origRestore := termRestore
+
+	termMakeRaw = func(fd int) (*term.State, error) {
+		return &term.State{}, nil
+	}
+	termReadPassword = func(fd int) ([]byte, error) {
+		return nil, errors.New("read password error")
+	}
+	termRestore = func(fd int, oldState *term.State) error {
+		return nil
+	}
+	defer func() {
+		termMakeRaw = origMakeRaw
+		termReadPassword = origReadPassword
+		termRestore = origRestore
+	}()
+
+	reader := bufio.NewReader(strings.NewReader("anything\n"))
+	result := promptSecret(reader, "")
+
+	if result != "" {
+		t.Errorf("expected empty string on ReadPassword error, got %q", result)
+	}
+}
+
+func TestPromptSecretSuccess(t *testing.T) {
+	origMakeRaw := termMakeRaw
+	origReadPassword := termReadPassword
+	origRestore := termRestore
+
+	termMakeRaw = func(fd int) (*term.State, error) {
+		return &term.State{}, nil
+	}
+	termReadPassword = func(fd int) ([]byte, error) {
+		return []byte("my-secret-key  "), nil
+	}
+	termRestore = func(fd int, oldState *term.State) error {
+		return nil
+	}
+	defer func() {
+		termMakeRaw = origMakeRaw
+		termReadPassword = origReadPassword
+		termRestore = origRestore
+	}()
+
+	reader := bufio.NewReader(strings.NewReader(""))
+	result := promptSecret(reader, "")
+
+	if result != "my-secret-key" {
+		t.Errorf("expected 'my-secret-key', got %q", result)
 	}
 }
 

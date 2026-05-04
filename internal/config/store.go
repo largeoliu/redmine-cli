@@ -9,6 +9,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+var yamlMarshal = yaml.Marshal
+
 // Store handles configuration persistence.
 type Store struct {
 	configDir string
@@ -73,7 +75,7 @@ func (s *Store) Save(cfg *Config) error {
 		return err
 	}
 	path := filepath.Clean(filepath.Join(s.configDir, "config.yaml"))
-	data, err := yaml.Marshal(cfg)
+	data, err := yamlMarshal(cfg)
 	if err != nil {
 		return err
 	}

@@ -21,6 +21,17 @@ type Keyring interface {
 	IsAvailable() bool
 }
 
+// keyringOps 封装对底层 keyring 包的调用，便于测试
+var keyringOps = struct {
+	Set    func(service, key, secret string) error
+	Get    func(service, key string) (string, error)
+	Delete func(service, key string) error
+}{
+	Set:    keyring.Set,
+	Get:    keyring.Get,
+	Delete: keyring.Delete,
+}
+
 // keyringServiceName 用于标识密钥环服务
 const keyringServiceName = "redmine-cli"
 
@@ -54,7 +65,7 @@ func NewKeyring() Keyring {
 
 func (k *realKeyring) Get(instanceName string) (string, error) {
 	key := formatKeyringKey(instanceName)
-	secret, err := keyring.Get(keyringServiceName, key)
+	secret, err := keyringOps.Get(keyringServiceName, key)
 	if err != nil {
 		if errors.Is(err, keyring.ErrNotFound) {
 			return "", ErrAPIKeyNotFound
@@ -66,7 +77,7 @@ func (k *realKeyring) Get(instanceName string) (string, error) {
 
 func (k *realKeyring) Set(instanceName, apiKey string) error {
 	key := formatKeyringKey(instanceName)
-	if err := keyring.Set(keyringServiceName, key, apiKey); err != nil {
+	if err := keyringOps.Set(keyringServiceName, key, apiKey); err != nil {
 		return fmt.Errorf("failed to set API key to keyring: %w", err)
 	}
 	return nil
@@ -74,7 +85,7 @@ func (k *realKeyring) Set(instanceName, apiKey string) error {
 
 func (k *realKeyring) Delete(instanceName string) error {
 	key := formatKeyringKey(instanceName)
-	if err := keyring.Delete(keyringServiceName, key); err != nil {
+	if err := keyringOps.Delete(keyringServiceName, key); err != nil {
 		if errors.Is(err, keyring.ErrNotFound) {
 			return ErrAPIKeyNotFound
 		}
@@ -89,18 +100,18 @@ func (k *realKeyring) IsAvailable() bool {
 	testValue := "test"
 
 	// 尝试写入
-	if err := keyring.Set(keyringServiceName, testKey, testValue); err != nil {
+	if err := keyringOps.Set(keyringServiceName, testKey, testValue); err != nil {
 		return false
 	}
 
 	// 尝试读取
-	_, err := keyring.Get(keyringServiceName, testKey)
+	_, err := keyringOps.Get(keyringServiceName, testKey)
 	if err != nil {
 		return false
 	}
 
 	// 清理测试数据
-	_ = keyring.Delete(keyringServiceName, testKey) //nolint:errcheck // 清理错误不影响可用性检查
+	_ = keyringOps.Delete(keyringServiceName, testKey) //nolint:errcheck // 清理错误不影响可用性检查
 
 	return true
 }

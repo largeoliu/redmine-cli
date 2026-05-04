@@ -654,6 +654,16 @@ func TestMainTimeout(t *testing.T) {
 }
 
 // TestMainDebugMode tests debug mode output
+func TestRun_ReturnsZeroOnHelp(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("REDMINE_CONFIG_DIR", tmpDir)
+
+	code := run()
+	if code != 0 {
+		t.Errorf("Expected run() to return 0 for no args (help), got %d", code)
+	}
+}
+
 func TestMainDebugMode(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
