@@ -141,10 +141,10 @@ jobs:
         run: |
           export GOTOOLCHAIN=auto
           head -1 coverage_0.out > coverage_all.out
-          for f in coverage_*.out; do
+          for f in coverage_0.out coverage_1.out coverage_2.out; do
             grep -v "^mode:" "$f" >> coverage_all.out
           done
-          echo "Merged coverage from $(ls coverage_*.out | wc -l | tr -d ' ') shards"
+          echo "Merged coverage from 3 shards"
           go tool cover -func=coverage_all.out
 
       - name: Check coverage threshold (90%)
