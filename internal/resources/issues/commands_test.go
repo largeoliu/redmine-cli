@@ -1333,3 +1333,75 @@ func TestResolveSprintID(t *testing.T) {
 		})
 	}
 }
+
+func TestSprintListResponse_UnmarshalJSON_InvalidJSON(t *testing.T) {
+	var resp sprintListResponse
+	err := resp.UnmarshalJSON([]byte(`{invalid`))
+	if err == nil {
+		t.Error("expected error for invalid JSON, got nil")
+	}
+}
+
+func TestSprintListResponse_UnmarshalJSON_InvalidAgileSprintsValue(t *testing.T) {
+	var resp sprintListResponse
+	err := resp.UnmarshalJSON([]byte(`{"agile_sprints": "not_an_array"}`))
+	if err == nil {
+		t.Error("expected error for invalid agile_sprints value, got nil")
+	}
+}
+
+func TestSprintListResponse_UnmarshalJSON_InvalidSprintsValue(t *testing.T) {
+	var resp sprintListResponse
+	err := resp.UnmarshalJSON([]byte(`{"sprints": "not_an_array"}`))
+	if err == nil {
+		t.Error("expected error for invalid sprints value, got nil")
+	}
+}
+
+func TestListCommand_SprintResolutionError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleJSON("/projects/1/agile_sprints.json", map[string]any{
+		"agile_sprints": []map[string]any{
+			{"id": 1, "name": "Sprint 1"},
+		},
+	})
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+	}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{"--project-id", "1", "--sprint", "NonExistentSprint"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error for sprint not found, got nil")
+	}
+}
+
+func TestListCommand_TrackerLookupError(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	mock.HandleError("/trackers.json", http.StatusNotFound, "Trackers not found")
+
+	flags := &types.GlobalFlags{}
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) {
+			return client.NewClient(mock.URL, "test-key"), nil
+		},
+	}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{"--project-id", "1", "--tracker", "NonExistentTracker"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error for tracker lookup failure, got nil")
+	}
+}
