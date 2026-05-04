@@ -1281,6 +1281,35 @@ func TestResolveSprintID(t *testing.T) {
 			wantID:  0,
 			wantErr: true,
 		},
+		{
+			name:      "sprint found by name with sprints field",
+			selector:  "Sprint 10",
+			projectID: 1,
+			setupMock: func(mock *testutil.MockServer) {
+				mock.HandleJSON("/projects/1/agile_sprints.json", map[string]any{
+					"sprints": []map[string]any{
+						{"id": 10, "name": "Sprint 10"},
+					},
+				})
+			},
+			wantID:  10,
+			wantErr: false,
+		},
+		{
+			name:      "sprint not found with sprints field",
+			selector:  "Non-existent Sprint",
+			projectID: 1,
+			setupMock: func(mock *testutil.MockServer) {
+				mock.HandleJSON("/projects/1/agile_sprints.json", map[string]any{
+					"sprints": []map[string]any{
+						{"id": 1, "name": "Sprint 1"},
+						{"id": 2, "name": "Sprint 2"},
+					},
+				})
+			},
+			wantID:  0,
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
