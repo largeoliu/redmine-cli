@@ -46,6 +46,26 @@
 - 结构化输出通过 `resolver.WriteOutput(...)` 统一处理
 - 涉及破坏性或写操作时，尊重 `--dry-run` 和 `--yes` 语义
 
+## Commit Message 规范
+
+- CI 使用 `commitlint` + `@commitlint/config-conventional` 校验，不符合规范的 commit 会导致 CI 失败
+- 格式：`<type>(<scope>): <description>`
+  - type 必须是以下之一：`feat`、`fix`、`perf`、`refactor`、`docs`、`style`、`test`、`build`、`ci`、`chore`、`revert`
+  - scope 可选，表示影响范围，如 `issues`、`client`、`output`、`deps`、`release`
+  - description 使用小写开头，不加句号
+- 示例：
+  - `feat(issues): add sprint filter support`
+  - `fix(client): retry on 429 status`
+  - `perf: reduce redundant JSON marshal`
+  - `chore(deps): bump golangci-lint to v2`
+  - `test: improve coverage for output package`
+- 禁止事项：
+  - 禁止使用规范外的 type（如 `add`、`update`、`change`）
+  - 禁止 description 为空
+  - 禁止首字母大写或末尾加句号
+  - 禁止多行 commit 的首行超过 72 字符
+- `release-please` 依赖 conventional commits 生成 changelog 和自动发版，保持格式一致至关重要
+
 ## Agent 实用建议
 
 - 优先运行最小相关验证，不要起手跑完整测试套件
