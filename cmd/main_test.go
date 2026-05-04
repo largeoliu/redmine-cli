@@ -690,6 +690,65 @@ func TestRun_ReturnsZeroOnHelp(t *testing.T) {
 	}
 }
 
+func TestRun_ReturnsNonZeroOnError(t *testing.T) {
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	tmpDir := t.TempDir()
+	t.Setenv("REDMINE_CONFIG_DIR", tmpDir)
+
+	os.Args = []string{"redmine", "nonexistent-cmd-xyz"}
+	code := run()
+	if code == 0 {
+		t.Error("Expected run() to return non-zero for invalid command, got 0")
+	}
+}
+
+func TestMainOsExitWithErrorCode(t *testing.T) {
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	tmpDir := t.TempDir()
+	t.Setenv("REDMINE_CONFIG_DIR", tmpDir)
+
+	os.Args = []string{"redmine", "nonexistent-cmd-xyz"}
+
+	type exitPanic struct {
+		exitCode int
+	}
+
+	osExit = func(code int) {
+		panic(exitPanic{exitCode: code})
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			if ep, ok := r.(exitPanic); ok {
+				if ep.exitCode == 0 {
+					t.Error("Expected non-zero exit code for invalid command, got 0")
+				}
+				return
+			}
+			t.Errorf("Unexpected panic: %v", r)
+		}
+	}()
+
+	main()
+}
+
+func TestRun_VersionCommand(t *testing.T) {
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	tmpDir := t.TempDir()
+	t.Setenv("REDMINE_CONFIG_DIR", tmpDir)
+
+	os.Args = []string{"redmine", "info"}
+	code := run()
+	if code != 0 {
+		t.Errorf("Expected run() to return 0 for version command, got %d", code)
+	}
+}
+
 func TestMainDebugMode(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")

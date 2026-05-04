@@ -270,12 +270,13 @@ func TestWriteOutputScalarPayloadWithFields(t *testing.T) {
 		name    string
 		payload any
 		fields  string
+		wantErr bool
 	}{
-		{"string with fields", "hello", "id"},
-		{"int with fields", 42, "id"},
-		{"float with fields", 3.14, "id"},
-		{"bool with fields", true, "id"},
-		{"nil with fields", nil, "id"},
+		{"string with fields", "hello", "id", false},
+		{"int with fields", 42, "id", false},
+		{"float with fields", 3.14, "id", false},
+		{"bool with fields", true, "id", false},
+		{"nil with fields", nil, "id", true},
 	}
 
 	for _, tt := range tests {
@@ -288,6 +289,12 @@ func TestWriteOutputScalarPayloadWithFields(t *testing.T) {
 			var buf bytes.Buffer
 			err := WriteOutput(&buf, flags, tt.payload)
 
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+				return
+			}
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
