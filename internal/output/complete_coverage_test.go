@@ -702,14 +702,10 @@ func TestSelectFieldsAllTypes(t *testing.T) {
 			},
 		},
 		{
-			name:   "nil",
-			data:   nil,
-			fields: []string{"id"},
-			check: func(t *testing.T, result any) {
-				if result != nil {
-					t.Error("expected nil result")
-				}
-			},
+			name:    "nil",
+			data:    nil,
+			fields:  []string{"id"},
+			wantErr: true,
 		},
 		{
 			name:   "channel",

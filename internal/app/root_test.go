@@ -1018,3 +1018,16 @@ func TestWriteOutputSelectFieldsNormalizeError(t *testing.T) {
 		t.Error("expected error from NormalizePayload for func field, got nil")
 	}
 }
+
+func TestWriteOutputSelectFieldsNormalizedError(t *testing.T) {
+	flags := &GlobalFlags{
+		Format: "json",
+		Fields: "id,name",
+	}
+
+	var buf bytes.Buffer
+	err := WriteOutput(&buf, flags, nil)
+	if err == nil {
+		t.Error("expected error from SelectFieldsNormalized for nil payload with fields, got nil")
+	}
+}
