@@ -307,6 +307,32 @@ func TestMainExitCode(t *testing.T) {
 	}
 }
 
+// TestMainOsExit tests the main function's osExit call for coverage
+func TestMainOsExit(t *testing.T) {
+	type exitPanic struct {
+		exitCode int
+	}
+
+	osExit = func(code int) {
+		panic(exitPanic{exitCode: code})
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			if ep, ok := r.(exitPanic); ok {
+				if ep.exitCode != 0 {
+					t.Errorf("Expected exit code 0, got %d", ep.exitCode)
+				}
+				return
+			}
+			t.Errorf("Unexpected panic: %v", r)
+		}
+		t.Error("Expected os.Exit to be called")
+	}()
+
+	main()
+}
+
 // TestMainWithEnvVars tests main with various environment variables
 func TestMainWithEnvVars(t *testing.T) {
 	if testing.Short() {

@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 )
 
@@ -262,9 +263,215 @@ func TestWriteOutputIntegerPayload(t *testing.T) {
 	}
 }
 
-// TestWriteOutputBooleanPayload tests WriteOutput with boolean payload
-func TestWriteOutputBooleanPayload(t *testing.T) {
-	payload := true
+// TestWriteOutputScalarPayloadWithFields tests WriteOutput with scalar payload and fields set
+// This covers the case where SelectFieldsNormalized returns input unchanged for non-collection types
+func TestWriteOutputScalarPayloadWithFields(t *testing.T) {
+	tests := []struct {
+		name    string
+		payload any
+		fields  string
+	}{
+		{"string with fields", "hello", "id"},
+		{"int with fields", 42, "id"},
+		{"float with fields", 3.14, "id"},
+		{"bool with fields", true, "id"},
+		{"nil with fields", nil, "id"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			flags := &GlobalFlags{
+				Format: "json",
+				Fields: tt.fields,
+			}
+
+			var buf bytes.Buffer
+			err := WriteOutput(&buf, flags, tt.payload)
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if buf.Len() == 0 {
+				t.Error("expected output, got empty")
+			}
+		})
+	}
+}
+
+// TestWriteOutputFieldsError tests WriteOutput when SelectFieldsNormalized returns an error
+// This is distinct from NormalizePayload errors
+func TestWriteOutputFieldsSelectFieldsError(t *testing.T) {
+	flags := &GlobalFlags{
+		Format: "json",
+		Fields: "id",
+	}
+
+	ch := make(chan int)
+	payload := map[string]any{
+		"id": 1,
+		"ch": ch,
+	}
+
+	var buf bytes.Buffer
+	err := WriteOutput(&buf, flags, payload)
+
+	if err == nil {
+		t.Error("expected error from SelectFieldsNormalized with unmarshallable payload, got nil")
+	}
+}
+
+// TestWriteOutputTableFormatWithFields tests WriteOutput with table format and fields
+// Covers line 227 when format is FormatTable
+func TestWriteOutputTableFormatWithFields(t *testing.T) {
+	payload := map[string]any{
+		"id":   1,
+		"name": "test",
+		"tags": []any{"a", "b"},
+	}
+
+	flags := &GlobalFlags{
+		Format: "table",
+		Fields: "id,name",
+	}
+
+	var buf bytes.Buffer
+	err := WriteOutput(&buf, flags, payload)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if buf.Len() == 0 {
+		t.Error("expected output, got empty")
+	}
+}
+
+// TestWriteOutputRawFormatWithFields tests WriteOutput with raw format and fields
+// Covers line 227 when format is FormatRaw
+func TestWriteOutputRawFormatWithFields(t *testing.T) {
+	payload := map[string]any{
+		"id":   1,
+		"name": "test",
+	}
+
+	flags := &GlobalFlags{
+		Format: "raw",
+		Fields: "id,name",
+	}
+
+	var buf bytes.Buffer
+	err := WriteOutput(&buf, flags, payload)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if buf.Len() == 0 {
+		t.Error("expected output, got empty")
+	}
+}
+
+// TestWriteOutputTableFormatNonMapArray tests WriteOutput with table format and array of non-maps
+// Covers output.Write with table format and non-map/slice input
+func TestWriteOutputTableFormatNonMapArray(t *testing.T) {
+	payload := []any{1, 2, 3, "four", true}
+
+	flags := &GlobalFlags{
+		Format: "table",
+	}
+
+	var buf bytes.Buffer
+	err := WriteOutput(&buf, flags, payload)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if buf.Len() == 0 {
+		t.Error("expected output, got empty")
+	}
+}
+
+// TestWriteOutputRawFormatScalar tests WriteOutput with raw format and scalar payload
+// Covers output.Write with raw format and string input
+func TestWriteOutputRawFormatScalar(t *testing.T) {
+	payload := "simple string value"
+
+	flags := &GlobalFlags{
+		Format: "raw",
+	}
+
+	var buf bytes.Buffer
+	err := WriteOutput(&buf, flags, payload)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if buf.Len() == 0 {
+		t.Error("expected output, got empty")
+	}
+}
+
+// TestWriteOutputSelectFieldsArrayPayload tests WriteOutput with fields on array payload
+// Covers SelectFieldsNormalized with array input
+func TestWriteOutputSelectFieldsArrayPayload(t *testing.T) {
+	payload := []map[string]any{
+		{"id": 1, "name": "first", "extra": "ignored"},
+		{"id": 2, "name": "second", "extra": "ignored"},
+	}
+
+	flags := &GlobalFlags{
+		Format: "json",
+		Fields: "id,name",
+	}
+
+	var buf bytes.Buffer
+	err := WriteOutput(&buf, flags, payload)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if buf.Len() == 0 {
+		t.Error("expected output, got empty")
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, `"id"`) && !strings.Contains(output, `"name"`) {
+		t.Error("expected output to contain id and name fields")
+	}
+}
+
+// TestWriteOutputSelectFieldsNestedArrayInMap tests the nested array handling in SelectFieldsNormalized
+// This covers the code path where SelectFieldsNormalized processes map with array values
+func TestWriteOutputSelectFieldsNestedArrayInMap(t *testing.T) {
+	payload := map[string]any{
+		"id": 1,
+		"items": []map[string]any{
+			{"id": 10, "name": "item1", "extra": "ignored"},
+			{"id": 20, "name": "item2", "extra": "ignored"},
+		},
+		"nested": map[string]any{
+			"inner": "value",
+		},
+	}
+
+	flags := &GlobalFlags{
+		Format: "json",
+		Fields: "id,items",
+	}
+
+	var buf bytes.Buffer
+	err := WriteOutput(&buf, flags, payload)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if buf.Len() == 0 {
+		t.Error("expected output, got empty")
+	}
+}
+
+// TestWriteOutputNoFieldsNoJQ tests WriteOutput with no fields and no JQ
+// This is the fallback path at line 230
+func TestWriteOutputNoFieldsNoJQ(t *testing.T) {
+	payload := map[string]any{"id": 1, "name": "test"}
 
 	flags := &GlobalFlags{
 		Format: "json",
@@ -274,10 +481,86 @@ func TestWriteOutputBooleanPayload(t *testing.T) {
 	err := WriteOutput(&buf, flags, payload)
 
 	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if buf.Len() == 0 {
+		t.Error("expected output, got empty")
+	}
+}
+
+// TestWriteOutputTableFormatWithJQ tests that JQ takes priority and returns early
+// This covers line 218 (ApplyJQNormalized return)
+func TestWriteOutputTableFormatWithJQ(t *testing.T) {
+	payload := map[string]any{
+		"id":   1,
+		"name": "test",
+		"items": []map[string]any{
+			{"id": 10, "name": "item1"},
+		},
 	}
 
-	if buf.String() == "" {
-		t.Error("Expected output, got empty")
+	flags := &GlobalFlags{
+		Format: "table",
+		JQ:     ".items[]",
+		Fields: "id,name",
+	}
+
+	var buf bytes.Buffer
+	err := WriteOutput(&buf, flags, payload)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if buf.Len() == 0 {
+		t.Error("expected output, got empty")
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "10") && !strings.Contains(output, "item1") {
+		t.Error("expected JQ-filtered output")
+	}
+}
+
+// TestWriteOutputEmptyPayload tests WriteOutput with empty/nil payload
+func TestWriteOutputEmptyPayload(t *testing.T) {
+	flags := &GlobalFlags{
+		Format: "json",
+	}
+
+	var buf bytes.Buffer
+
+	err := WriteOutput(&buf, flags, map[string]any{})
+	if err != nil {
+		t.Fatalf("unexpected error for empty map: %v", err)
+	}
+
+	err = WriteOutput(&buf, flags, []any{})
+	if err != nil {
+		t.Fatalf("unexpected error for empty slice: %v", err)
+	}
+}
+
+// TestWriteOutputMapWithNestedMap tests WriteOutput with nested map structure
+func TestWriteOutputMapWithNestedMap(t *testing.T) {
+	payload := map[string]any{
+		"id": 1,
+		"nested": map[string]any{
+			"level": 2,
+			"data":  "value",
+		},
+	}
+
+	flags := &GlobalFlags{
+		Format: "table",
+	}
+
+	var buf bytes.Buffer
+	err := WriteOutput(&buf, flags, payload)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if buf.Len() == 0 {
+		t.Error("expected output, got empty")
 	}
 }
