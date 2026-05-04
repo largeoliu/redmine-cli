@@ -22,12 +22,11 @@ func TestClient_List_Success(t *testing.T) {
 	mock := testutil.NewMockServer(t)
 	defer mock.Close()
 
-	defaultStatus := 1
 	response := TrackerList{
 		Trackers: []Tracker{
-			{ID: 1, Name: "Bug", DefaultStatus: &defaultStatus, Description: "Bug tracking"},
+			{ID: 1, Name: "Bug", DefaultStatus: &Reference{ID: 1, Name: "New"}, Description: "Bug tracking"},
 			{ID: 2, Name: "Feature", DefaultStatus: nil, Description: "Feature requests"},
-			{ID: 3, Name: "Support", DefaultStatus: &defaultStatus, Description: ""},
+			{ID: 3, Name: "Support", DefaultStatus: &Reference{ID: 1, Name: "New"}, Description: ""},
 		},
 	}
 	mock.HandleJSON("/trackers.json", response)
@@ -51,11 +50,68 @@ func TestClient_List_Success(t *testing.T) {
 	if result.Trackers[0].Description != "Bug tracking" {
 		t.Errorf("expected first tracker description 'Bug tracking', got %s", result.Trackers[0].Description)
 	}
-	if result.Trackers[0].DefaultStatus == nil || *result.Trackers[0].DefaultStatus != 1 {
-		t.Error("expected first tracker default status to be 1")
+	if result.Trackers[0].DefaultStatus == nil || result.Trackers[0].DefaultStatus.ID != 1 {
+		t.Error("expected first tracker default status ID to be 1")
+	}
+	if result.Trackers[0].DefaultStatus != nil && result.Trackers[0].DefaultStatus.Name != "New" {
+		t.Errorf("expected first tracker default status name 'New', got %s", result.Trackers[0].DefaultStatus.Name)
 	}
 
 	// Verify second tracker has nil default status
+	if result.Trackers[1].DefaultStatus != nil {
+		t.Error("expected second tracker default status to be nil")
+	}
+}
+
+func TestClient_List_RealAPIFormat(t *testing.T) {
+	mock := testutil.NewMockServer(t)
+	defer mock.Close()
+
+	response := map[string]any{
+		"trackers": []map[string]any{
+			{
+				"id":          1,
+				"name":        "Bug",
+				"description": "Bug tracking",
+				"default_status": map[string]any{
+					"id":   1,
+					"name": "New",
+				},
+			},
+			{
+				"id":          2,
+				"name":        "Feature",
+				"description": "Feature requests",
+			},
+		},
+	}
+	mock.HandleJSON("/trackers.json", response)
+
+	c := client.NewClient(mock.URL, "test-key")
+	trackerClient := NewClient(c)
+
+	result, err := trackerClient.List(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Trackers) != 2 {
+		t.Fatalf("expected 2 trackers, got %d", len(result.Trackers))
+	}
+
+	if result.Trackers[0].Name != "Bug" {
+		t.Errorf("expected first tracker name 'Bug', got %s", result.Trackers[0].Name)
+	}
+	if result.Trackers[0].DefaultStatus == nil {
+		t.Fatal("expected first tracker default status to be non-nil")
+	}
+	if result.Trackers[0].DefaultStatus.ID != 1 {
+		t.Errorf("expected default status ID 1, got %d", result.Trackers[0].DefaultStatus.ID)
+	}
+	if result.Trackers[0].DefaultStatus.Name != "New" {
+		t.Errorf("expected default status name 'New', got %s", result.Trackers[0].DefaultStatus.Name)
+	}
+
 	if result.Trackers[1].DefaultStatus != nil {
 		t.Error("expected second tracker default status to be nil")
 	}
