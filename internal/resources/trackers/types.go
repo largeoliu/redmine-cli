@@ -15,11 +15,17 @@ type TrackerCustomField struct {
 	PossibleValues []ValueLabel `json:"possible_values,omitempty"`
 }
 
+// Reference represents a reference to another Redmine entity.
+type Reference struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
 // Tracker represents a Redmine tracker.
 type Tracker struct {
 	ID            int                  `json:"id"`
 	Name          string               `json:"name"`
-	DefaultStatus *int                 `json:"default_status,omitempty"`
+	DefaultStatus *Reference           `json:"default_status,omitempty"`
 	Description   string               `json:"description,omitempty"`
 	CustomFields  []TrackerCustomField `json:"custom_fields,omitempty"`
 }
