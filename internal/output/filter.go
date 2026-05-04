@@ -3,6 +3,7 @@ package output
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 
 	"github.com/itchyny/gojq"
@@ -73,6 +74,9 @@ func ApplyJQ(w io.Writer, payload any, expr string) error {
 func SelectFieldsNormalized(input any, fields []string) (any, error) {
 	if len(fields) == 0 {
 		return input, nil
+	}
+	if input == nil {
+		return nil, fmt.Errorf("cannot select fields from nil payload")
 	}
 	if arr, ok := input.([]any); ok {
 		fieldSet := make(map[string]struct{}, len(fields))

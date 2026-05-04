@@ -11,6 +11,17 @@ import (
 	"github.com/largeoliu/redmine-cli/internal/errors"
 )
 
+var (
+	jsonMarshal     = json.Marshal
+	jsonUnmarshalFn = jsonUnmarshal
+	typeAssertMap   = typeAssertMapFn
+)
+
+func typeAssertMapFn(v any) (map[string]any, bool) {
+	m, ok := v.(map[string]any)
+	return m, ok
+}
+
 // Format represents the output format type.
 type Format string
 
@@ -96,12 +107,12 @@ func NormalizePayload(payload any) (any, error) {
 	if text, ok := payload.(string); ok {
 		return text, nil
 	}
-	data, err := json.Marshal(payload)
+	data, err := jsonMarshal(payload)
 	if err != nil {
 		return nil, errors.NewInternal("failed to normalize payload")
 	}
 	var normalized any
-	if err := json.Unmarshal(data, &normalized); err != nil {
+	if err := jsonUnmarshalFn(data, &normalized); err != nil {
 		return nil, errors.NewInternal("failed to decode normalized payload")
 	}
 	return normalized, nil
@@ -226,7 +237,7 @@ func rowsFromSlice(items []any) ([]string, [][]string, bool) {
 	allMaps := true
 	keys := make(map[string]struct{})
 	for _, item := range items {
-		rowMap, ok := item.(map[string]any)
+		rowMap, ok := typeAssertMap(item)
 		if !ok {
 			allMaps = false
 			break
@@ -239,7 +250,7 @@ func rowsFromSlice(items []any) ([]string, [][]string, bool) {
 		headers := sortedKeys(keys)
 		rows := make([][]string, 0, len(items))
 		for _, item := range items {
-			rowMap, ok := item.(map[string]any)
+			rowMap, ok := typeAssertMap(item)
 			if !ok {
 				return nil, nil, false
 			}

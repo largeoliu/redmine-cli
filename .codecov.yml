@@ -1,7 +1,3 @@
-ignore:
-  - "cmd/main.go"
-  - "internal/app/root.go"
-
 coverage:
   status:
     project:

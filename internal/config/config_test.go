@@ -2,6 +2,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -704,5 +705,20 @@ func TestStoreDeleteInstanceWhenDefaultIsLast(t *testing.T) {
 	}
 	if loaded.Default != "" {
 		t.Errorf("expected empty default after deleting last instance, got %s", loaded.Default)
+	}
+}
+
+func TestStoreSaveMarshalError(t *testing.T) {
+	dir := t.TempDir()
+	store := NewStoreWithKeyring(dir, &mockKeyring{})
+
+	marshalErr := errors.New("marshal failed")
+	origMarshal := yamlMarshal
+	yamlMarshal = func(v interface{}) ([]byte, error) { return nil, marshalErr }
+	defer func() { yamlMarshal = origMarshal }()
+
+	err := store.Save(DefaultConfig())
+	if err != marshalErr {
+		t.Errorf("expected marshalErr, got %v", err)
 	}
 }

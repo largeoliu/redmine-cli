@@ -1,4 +1,3 @@
-// cmd/main.go
 package main
 
 import (
@@ -7,6 +6,12 @@ import (
 	"github.com/largeoliu/redmine-cli/internal/app"
 )
 
+var osExit = os.Exit
+
+func run() int {
+	return app.Execute()
+}
+
 func main() {
-	os.Exit(app.Execute())
+	osExit(run())
 }
