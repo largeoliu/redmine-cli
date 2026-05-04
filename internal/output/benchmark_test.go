@@ -309,6 +309,43 @@ func BenchmarkFormatValue(b *testing.B) {
 	}
 }
 
+// BenchmarkApplyJQNormalized tests ApplyJQ with pre-compiled query performance
+func BenchmarkApplyJQNormalized(b *testing.B) {
+	items := make([]map[string]any, 100)
+	for i := 0; i < 100; i++ {
+		items[i] = map[string]any{
+			"id":      i + 1,
+			"subject": "Issue " + itoaOutput(i+1),
+			"status":  "open",
+		}
+	}
+	data := map[string]any{"issues": items}
+	query, _ := ParseJQ(".issues[] | {id, subject, status}")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var buf bytes.Buffer
+		_ = ApplyJQNormalized(&buf, data, query)
+	}
+}
+
+// BenchmarkSelectFieldsNormalized tests SelectFieldsNormalized performance
+func BenchmarkSelectFieldsNormalized(b *testing.B) {
+	items := make([]map[string]any, 100)
+	for i := 0; i < 100; i++ {
+		items[i] = map[string]any{
+			"id":      i + 1,
+			"subject": "Issue " + itoaOutput(i+1),
+			"status":  "open",
+		}
+	}
+	data := map[string]any{"issues": items}
+	fields := []string{"id", "subject", "status"}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = SelectFieldsNormalized(data, fields)
+	}
+}
+
 // 辅助函数
 func itoaOutput(n int) string {
 	if n == 0 {
