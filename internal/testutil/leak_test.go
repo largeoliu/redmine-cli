@@ -2,7 +2,11 @@
 package testutil
 
 import (
+	"bytes"
+	"errors"
+	"fmt"
 	"os"
+	"os/exec"
 	"runtime"
 	"testing"
 	"time"
@@ -466,6 +470,80 @@ func TestLeakTestMainExitCodes(t *testing.T) {
 			t.Errorf("expected exit code 1, got %d", exitCode)
 		}
 	})
+}
+
+func TestLeakTestMainWithOptionsLeakDetected(t *testing.T) {
+	if os.Getenv("TEST_LEAK_DETECTION") == "1" {
+		done := make(chan struct{})
+		go func() {
+			<-done
+		}()
+
+		runtime.Gosched()
+		time.Sleep(50 * time.Millisecond)
+
+		m := &testing.M{}
+		LeakTestMainWithOptions(m)
+		return
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run=^TestLeakTestMainWithOptionsLeakDetected$")
+	cmd.Env = append(os.Environ(), "TEST_LEAK_DETECTION=1")
+
+	if coverDir := os.Getenv("GOCOVERDIR"); coverDir != "" {
+		cmd.Env = append(cmd.Env, "GOCOVERDIR="+coverDir)
+	}
+
+	err := cmd.Run()
+
+	if err == nil {
+		t.Error("expected non-zero exit code when goroutine leak detected")
+	}
+
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		if exitErr.ExitCode() == 0 {
+			t.Error("expected non-zero exit code")
+		}
+	}
+}
+
+func TestVerifyNoneWithDelayLeakDetected(t *testing.T) {
+	if os.Getenv("TEST_VERIFY_NONE_DELAY_LEAK") == "1" {
+		done := make(chan struct{})
+		go func() {
+			<-done
+		}()
+
+		runtime.Gosched()
+		time.Sleep(50 * time.Millisecond)
+
+		t := &testing.T{}
+		VerifyNoneWithDelay(t, 0)
+		time.Sleep(100 * time.Millisecond)
+
+		if !t.Failed() {
+			fmt.Println("TEST_PASSED")
+		}
+		return
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run=^TestVerifyNoneWithDelayLeakDetected$")
+	cmd.Env = append(os.Environ(), "TEST_VERIFY_NONE_DELAY_LEAK=1")
+
+	if coverDir := os.Getenv("GOCOVERDIR"); coverDir != "" {
+		cmd.Env = append(cmd.Env, "GOCOVERDIR="+coverDir)
+	}
+
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		t.Fatalf("subprocess failed: %v\noutput: %s", err, output)
+	}
+
+	if !bytes.Contains(output, []byte("TEST_PASSED")) {
+		t.Errorf("expected subprocess to print TEST_PASSED, got: %s", output)
+	}
 }
 
 // TestLeakDetectionWithRealGoroutines tests with actual goroutines
