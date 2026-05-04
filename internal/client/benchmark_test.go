@@ -196,6 +196,20 @@ func BenchmarkNewClientWithOptions(b *testing.B) {
 }
 
 // 辅助函数：将数据转换�?JSON 字符�?
+// BenchmarkPing tests Ping with shared shortClient performance
+func BenchmarkPing(b *testing.B) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	client := NewClient(server.URL, "test-api-key")
+	ctx := context.Background()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = client.Ping(ctx)
+	}
+}
+
 func largeDataToJSON(data []map[string]any) string {
 	var result string
 	for i, item := range data {

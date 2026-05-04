@@ -205,20 +205,29 @@ func ResolveFormat(flags *GlobalFlags) output.Format {
 func WriteOutput(w io.Writer, flags *GlobalFlags, payload any) error {
 	format := ResolveFormat(flags)
 
+	normalizedPayload, err := output.NormalizePayload(payload)
+	if err != nil {
+		return err
+	}
+
 	if flags.JQ != "" {
-		return output.ApplyJQ(w, payload, flags.JQ)
+		query, err := output.ParseJQ(flags.JQ)
+		if err != nil {
+			return err
+		}
+		return output.ApplyJQNormalized(w, normalizedPayload, query)
 	}
 
 	if flags.Fields != "" {
 		fields := parseFields(flags.Fields)
-		filtered, err := output.SelectFields(payload, fields)
+		filtered, err := output.SelectFieldsNormalized(normalizedPayload, fields)
 		if err != nil {
 			return err
 		}
-		payload = filtered
+		return output.Write(w, format, filtered)
 	}
 
-	return output.Write(w, format, payload)
+	return output.Write(w, format, normalizedPayload)
 }
 
 func parseFields(s string) []string {

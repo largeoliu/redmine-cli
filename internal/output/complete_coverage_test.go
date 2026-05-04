@@ -658,9 +658,9 @@ func TestSelectFieldsAllTypes(t *testing.T) {
 			data:   []int{1, 2, 3},
 			fields: []string{"id"},
 			check: func(t *testing.T, result any) {
-				slice, ok := result.([]int)
+				slice, ok := result.([]any)
 				if !ok {
-					t.Error("expected slice result")
+					t.Errorf("expected []any result, got %T", result)
 					return
 				}
 				if len(slice) != 3 {
