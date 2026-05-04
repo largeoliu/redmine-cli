@@ -615,6 +615,39 @@ func TestApplyJQAllTypes(t *testing.T) {
 }
 
 // TestSelectFieldsAllTypes 测试 SelectFields 的所有类型
+func TestRowsFromSliceTypeAssertionFailure(t *testing.T) {
+	originalAssert := typeAssertMap
+	defer func() { typeAssertMap = originalAssert }()
+
+	callCount := 0
+	typeAssertMap = func(v any) (map[string]any, bool) {
+		callCount++
+		if callCount == 1 {
+			return map[string]any{"id": 1}, true
+		}
+		if callCount == 2 {
+			return map[string]any{"id": 2}, true
+		}
+		if callCount == 3 {
+			return nil, false
+		}
+		return typeAssertMapFn(v)
+	}
+
+	items := []any{map[string]any{"id": 1}, map[string]any{"id": 2}}
+	headers, rows, ok := rowsFromSlice(items)
+
+	if ok {
+		t.Error("expected ok to be false when second loop type assertion fails")
+	}
+	if headers != nil {
+		t.Error("expected nil headers")
+	}
+	if rows != nil {
+		t.Error("expected nil rows")
+	}
+}
+
 func TestSelectFieldsAllTypes(t *testing.T) {
 	tests := []struct {
 		name    string

@@ -51,18 +51,15 @@ func LeakTestMainWithOptions(m *testing.M, opts ...goleak.Option) {
 //	}
 func VerifyNone(t *testing.T, opts ...goleak.Option) {
 	t.Helper()
-	if err := goleak.Find(opts...); err != nil {
+	if err := goleakFind(opts...); err != nil {
 		t.Errorf("goroutine leak detected: %v", err)
 	}
 }
 
-// VerifyNoneWithDelay detects goroutine leaks with delay
 func VerifyNoneWithDelay(t *testing.T, _ int, opts ...goleak.Option) {
 	t.Helper()
 	t.Cleanup(func() {
-		if err := goleakFind(opts...); err != nil {
-			t.Errorf("goroutine leak detected: %v", err)
-		}
+		VerifyNone(t, opts...)
 	})
 }
 

@@ -940,6 +940,38 @@ func TestResolverWriteOutputError(t *testing.T) {
 }
 
 // 测试 parseFields 边界情况
+func TestSplitByCommaEdgeCases(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		{"only comma", ",", []string{""}},
+		{"multiple commas", ",,,", []string{"", "", ""}},
+		{"spaces around values", " a , b , c ", []string{" a ", " b ", " c "}},
+		{"empty between commas", "a,,b", []string{"a", "", "b"}},
+		{"single comma with spaces", " , ", []string{" ", " "}},
+		{"unicode characters", "中文,英文", []string{"中文", "英文"}},
+		{"tab characters", "a\tb,c", []string{"a\tb", "c"}},
+		{"newline characters", "a\nb,c", []string{"a\nb", "c"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := splitByComma(tt.input)
+			if len(result) != len(tt.expected) {
+				t.Errorf("expected %d parts, got %d: %v", len(tt.expected), len(result), result)
+				return
+			}
+			for i, v := range result {
+				if v != tt.expected[i] {
+					t.Errorf("expected part[%d] = %q, got %q", i, tt.expected[i], v)
+				}
+			}
+		})
+	}
+}
+
 func TestParseFieldsEdgeCases(t *testing.T) {
 	tests := []struct {
 		name     string
