@@ -56,6 +56,7 @@ func VerifyNone(t *testing.T, opts ...goleak.Option) {
 	}
 }
 
+// VerifyNoneWithDelay runs VerifyNone in t.Cleanup. The second parameter is for backward compatibility.
 func VerifyNoneWithDelay(t *testing.T, _ int, opts ...goleak.Option) {
 	t.Helper()
 	t.Cleanup(func() {
