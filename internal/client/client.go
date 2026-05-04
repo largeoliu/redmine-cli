@@ -16,6 +16,8 @@ import (
 	"github.com/largeoliu/redmine-cli/internal/errors"
 )
 
+var shortClient = &http.Client{Timeout: 3 * time.Second}
+
 // Client is the HTTP client for Redmine API.
 type Client struct {
 	mu         sync.RWMutex
@@ -235,8 +237,7 @@ func (c *Client) Ping(ctx context.Context) error {
 		return errors.NewNetwork("URL 格式无效", errors.WithCause(err))
 	}
 
-	client := &http.Client{Timeout: 3 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := shortClient.Do(req)
 	if err != nil {
 		return errors.NewNetwork("URL 无法访问", errors.WithActions(
 			"1) URL 正确",

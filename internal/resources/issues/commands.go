@@ -4,6 +4,7 @@ package issues
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -21,7 +22,24 @@ import (
 )
 
 type sprintListResponse struct {
-	AgileSprints []sprintRef `json:"agile_sprints"`
+	AgileSprints []sprintRef
+}
+
+func (r *sprintListResponse) UnmarshalJSON(data []byte) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	if raw, ok := fields["agile_sprints"]; ok {
+		if err := json.Unmarshal(raw, &r.AgileSprints); err != nil {
+			return err
+		}
+	} else if raw, ok := fields["sprints"]; ok {
+		if err := json.Unmarshal(raw, &r.AgileSprints); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type sprintRef struct {
