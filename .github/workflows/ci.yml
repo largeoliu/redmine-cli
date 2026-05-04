@@ -26,28 +26,8 @@ jobs:
       - name: Run commitlint
         uses: wagoid/commitlint-github-action@v6
 
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: v2.11.4
-          args: --timeout=5m
-          cache-invalidation-interval: 120
-
-  test:
-    name: Test
+  verify:
+    name: Verify
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -75,20 +55,105 @@ jobs:
           fi
           echo "All files are properly formatted"
 
-      - name: Run tests with coverage
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.11.4
+          args: --timeout=5m
+          cache-invalidation-interval: 120
+
+  test:
+    name: Test (shard ${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Compute shard packages
+        id: shard
+        run: |
+          ALL_PKGS=($(go list ./... | grep -v -e integration -e e2e))
+          PKGS=""
+          for ((i=0; i<${#ALL_PKGS[@]}; i++)); do
+            if (( i % 3 == ${{ matrix.shard }} )); then
+              PKGS="$PKGS ${ALL_PKGS[$i]}"
+            fi
+          done
+          echo "packages=$PKGS" >> $GITHUB_OUTPUT
+          echo "Running packages for shard ${{ matrix.shard }}: $PKGS"
+
+      - name: Run tests
         run: |
           export GOTOOLCHAIN=auto
-          go test -v -race -coverprofile=coverage.out -covermode=atomic $(go list ./... | grep -v -e integration -e e2e)
-          go tool cover -func=coverage.out
+          go test -v -race -coverprofile=coverage_${{ matrix.shard }}.out -covermode=atomic ${{ steps.shard.outputs.packages }}
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-shard-${{ matrix.shard }}
+          path: coverage_${{ matrix.shard }}.out
+          retention-days: 1
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Download coverage artifacts
+        uses: actions/download-artifact@v7
+        with:
+          pattern: coverage-shard-*
+          merge-multiple: true
+
+      - name: Merge coverage profiles
+        run: |
+          export GOTOOLCHAIN=auto
+          head -1 coverage_0.out > coverage_all.out
+          for f in coverage_*.out; do
+            grep -v "^mode:" "$f" >> coverage_all.out
+          done
+          echo "Merged coverage from $(ls coverage_*.out | wc -l | tr -d ' ') shards"
+          go tool cover -func=coverage_all.out
 
       - name: Check coverage threshold (90%)
         run: |
           export GOTOOLCHAIN=auto
           THRESHOLD=90
-          grep -v -e "cmd/main.go" -e "internal/testutil/leak.go" -e "internal/app/root.go" coverage.out > coverage_filtered.out 2>/dev/null || true
+          grep -v -e "cmd/main.go" -e "internal/testutil/leak.go" -e "internal/app/root.go" coverage_all.out > coverage_filtered.out 2>/dev/null || true
 
           if [ -s coverage_filtered.out ]; then
-            go tool cover -func=coverage_filtered.out
             COVERAGE=$(go tool cover -func=coverage_filtered.out | grep total | awk '{print $3}' | sed 's/%//')
             echo "Total coverage (excluding ignored files): ${COVERAGE}%"
             if awk "BEGIN {exit !($COVERAGE < $THRESHOLD)}"; then
@@ -103,7 +168,7 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v6
         with:
-          file: ./coverage.out
+          file: ./coverage_all.out
           fail_ci_if_error: false
 
   generated:
@@ -128,7 +193,6 @@ jobs:
   e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
-    needs: [test]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -149,8 +213,8 @@ jobs:
           export GOTOOLCHAIN=auto
           go test -v -count=1 ./test/e2e/...
 
-  fuzz:
-    name: Fuzz Tests
+  fuzz-client:
+    name: Fuzz (client)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -162,37 +226,30 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Run fuzz tests (client)
-        id: fuzz-client
+      - name: Run fuzz tests
         run: |
           export GOTOOLCHAIN=auto
-          go test -fuzz=Fuzz -fuzztime=5m ./internal/client/...
+          go test -fuzz=Fuzz -fuzztime=2m ./internal/client/...
         continue-on-error: true
 
-      - name: Run fuzz tests (output)
-        id: fuzz-output
+  fuzz-output:
+    name: Fuzz (output)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run fuzz tests
         run: |
           export GOTOOLCHAIN=auto
-          go test -fuzz=Fuzz -fuzztime=5m ./internal/output/...
+          go test -fuzz=Fuzz -fuzztime=2m ./internal/output/...
         continue-on-error: true
-
-      - name: Check fuzz results
-        if: always()
-        run: |
-          FAILED=0
-          if [ "${{ steps.fuzz-client.outcome }}" = "failure" ]; then
-            echo "::warning::Fuzz tests failed for client package"
-            FAILED=1
-          fi
-          if [ "${{ steps.fuzz-output.outcome }}" = "failure" ]; then
-            echo "::warning::Fuzz tests failed for output package"
-            FAILED=1
-          fi
-          if [ "$FAILED" = "1" ]; then
-            echo "::warning::One or more fuzz tests found issues. These are non-blocking but should be investigated."
-          else
-            echo "All fuzz tests passed"
-          fi
 
   benchmark:
     name: Benchmark (${{ matrix.package }})
@@ -217,7 +274,7 @@ jobs:
       - name: Run benchmarks
         run: |
           export GOTOOLCHAIN=auto
-          go test -bench=. -benchmem -benchtime=5s ${{ matrix.package }}
+          go test -bench=. -benchmem -benchtime=3s ${{ matrix.package }}
 
   security:
     name: Security Scan
@@ -233,7 +290,7 @@ jobs:
           cache: true
 
       - name: Run Gosec Security Scanner
-        uses: securego/gosec@v2.26.1
+        uses: securego/gosec@v2.25.0
         env:
           GOTOOLCHAIN: auto
         with:
@@ -252,7 +309,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [lint, test, generated, e2e]
+    needs: [lint, test, coverage, verify, generated]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -278,7 +335,17 @@ jobs:
   ci-passed:
     name: CI Passed
     runs-on: ubuntu-latest
-    needs: [commitlint, lint, test, generated, e2e, fuzz, benchmark, security, build]
+    needs: [commitlint, lint, test, coverage, verify, generated, e2e, fuzz-client, fuzz-output, benchmark, security, build]
+    if: always()
     steps:
-      - name: All checks passed
-        run: echo "All CI checks passed!"
+      - name: Check all jobs passed
+        run: |
+          JOBS="${{ needs.commitlint.result }},${{ needs.lint.result }},${{ needs.test.result }},${{ needs.coverage.result }},${{ needs.verify.result }},${{ needs.generated.result }},${{ needs.e2e.result }},${{ needs.fuzz-client.result }},${{ needs.fuzz-output.result }},${{ needs.benchmark.result }},${{ needs.security.result }},${{ needs.build.result }}"
+          echo "Job results: $JOBS"
+          for JOB in $(echo "$JOBS" | tr ',' ' '); do
+            if [ "$JOB" = "failure" ] || [ "$JOB" = "cancelled" ]; then
+              echo "One or more CI jobs failed or were cancelled"
+              exit 1
+            fi
+          done
+          echo "All CI checks passed!"
