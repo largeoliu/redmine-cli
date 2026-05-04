@@ -9,6 +9,11 @@ import (
 	"go.uber.org/goleak"
 )
 
+var (
+	goleakFind = goleak.Find
+	osExitFunc = os.Exit
+)
+
 // LeakTestMain provides TestMain function with goroutine leak detection
 // Usage:
 //
@@ -28,13 +33,13 @@ func LeakTestMain(m *testing.M) {
 // LeakTestMainWithOptions provides TestMain function with custom options
 func LeakTestMainWithOptions(m *testing.M, opts ...goleak.Option) {
 	defer func() {
-		if err := goleak.Find(opts...); err != nil {
+		if err := goleakFind(opts...); err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "goroutine leak detected: %v\n", err)
-			os.Exit(1)
+			osExitFunc(1)
 		}
 	}()
 
-	os.Exit(m.Run())
+	osExitFunc(m.Run())
 }
 
 // VerifyNone detects current goroutine leaks
@@ -55,7 +60,7 @@ func VerifyNone(t *testing.T, opts ...goleak.Option) {
 func VerifyNoneWithDelay(t *testing.T, _ int, opts ...goleak.Option) {
 	t.Helper()
 	t.Cleanup(func() {
-		if err := goleak.Find(opts...); err != nil {
+		if err := goleakFind(opts...); err != nil {
 			t.Errorf("goroutine leak detected: %v", err)
 		}
 	})

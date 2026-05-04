@@ -802,3 +802,66 @@ func TestVerifyNoneWithDelayCleanup(t *testing.T) {
 		VerifyNoneWithDelay(t, 1, opts...)
 	})
 }
+
+func TestLeakTestMainWithOptionsErrorPath(t *testing.T) {
+	if os.Getenv("TEST_LEAK_MAIN_ERROR") == "1" {
+		origFind := goleakFind
+		defer func() { goleakFind = origFind }()
+		goleakFind = func(opts ...goleak.Option) error {
+			return fmt.Errorf("goroutine leak detected")
+		}
+
+		origExit := osExitFunc
+		defer func() { osExitFunc = origExit }()
+		osExitFunc = func(code int) {
+			if code != 1 {
+				fmt.Println("WRONG_EXIT_CODE")
+			}
+		}
+
+		m := &testing.M{}
+		LeakTestMainWithOptions(m)
+		return
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run=^TestLeakTestMainWithOptionsErrorPath$")
+	cmd.Env = append(os.Environ(), "TEST_LEAK_MAIN_ERROR=1")
+	if coverDir := os.Getenv("GOCOVERDIR"); coverDir != "" {
+		cmd.Env = append(cmd.Env, "GOCOVERDIR="+coverDir)
+	}
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected non-zero exit code, got: %s", output)
+	}
+}
+
+func TestVerifyNoneWithDelayErrorPath(t *testing.T) {
+	if os.Getenv("TEST_VERIFY_DELAY_ERROR") == "1" {
+		origFind := goleakFind
+		defer func() { goleakFind = origFind }()
+		goleakFind = func(opts ...goleak.Option) error {
+			return fmt.Errorf("goroutine leak detected")
+		}
+
+		mt := &testing.T{}
+		VerifyNoneWithDelay(mt, 0)
+
+		if !mt.Failed() {
+			fmt.Println("TEST_PASSED")
+		}
+		return
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run=^TestVerifyNoneWithDelayErrorPath$")
+	cmd.Env = append(os.Environ(), "TEST_VERIFY_DELAY_ERROR=1")
+	if coverDir := os.Getenv("GOCOVERDIR"); coverDir != "" {
+		cmd.Env = append(cmd.Env, "GOCOVERDIR="+coverDir)
+	}
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("subprocess failed: %v\noutput: %s", err, output)
+	}
+	if !bytes.Contains(output, []byte("TEST_PASSED")) {
+		t.Errorf("expected TEST_PASSED in output, got: %s", output)
+	}
+}

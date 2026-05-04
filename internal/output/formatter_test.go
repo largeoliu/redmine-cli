@@ -3,6 +3,7 @@ package output
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 )
 
@@ -104,6 +105,19 @@ func TestNormalizePayloadUnmarshalError(t *testing.T) {
 	_, err := normalizePayload(bad)
 	if err == nil {
 		t.Fatal("expected error for unmarshalable type, got nil")
+	}
+}
+
+func TestNormalizePayloadUnmarshalErrorPath(t *testing.T) {
+	original := jsonUnmarshalFn
+	jsonUnmarshalFn = func(data []byte, v any) error {
+		return errors.New("forced unmarshal error")
+	}
+	t.Cleanup(func() { jsonUnmarshalFn = original })
+
+	_, err := normalizePayload(map[string]string{"key": "value"})
+	if err == nil {
+		t.Fatal("expected error when unmarshal fails, got nil")
 	}
 }
 

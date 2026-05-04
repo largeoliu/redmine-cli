@@ -6,10 +6,12 @@ import (
 	"github.com/largeoliu/redmine-cli/internal/app"
 )
 
+var osExit = os.Exit
+
 func run() int {
 	return app.Execute()
 }
 
 func main() {
-	os.Exit(run())
+	osExit(run())
 }

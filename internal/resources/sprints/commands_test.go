@@ -342,6 +342,46 @@ func TestGetCommand_InvalidSprintID(t *testing.T) {
 	}
 }
 
+func TestListCommand_APIError(t *testing.T) {
+	flags := &types.GlobalFlags{Format: "json"}
+	c := client.NewClient("https://example.com", "test-key", client.WithHTTPClient(&http.Client{
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			return nil, errors.New("API error")
+		}),
+	}))
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) { return c, nil },
+	}
+
+	cmd := newListCommand(flags, resolver)
+	cmd.SetArgs([]string{"--project", "42"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when API fails")
+	}
+}
+
+func TestGetCommand_APIError(t *testing.T) {
+	flags := &types.GlobalFlags{Format: "json"}
+	c := client.NewClient("https://example.com", "test-key", client.WithHTTPClient(&http.Client{
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			return nil, errors.New("API error")
+		}),
+	}))
+	resolver := &mockResolver{
+		resolveClientFunc: func(_ *types.GlobalFlags) (*client.Client, error) { return c, nil },
+	}
+
+	cmd := newGetCommand(flags, resolver)
+	cmd.SetArgs([]string{"--project-id", "42", "7"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when API fails")
+	}
+}
+
 func TestListCommand_ResolveClientError(t *testing.T) {
 	flags := &types.GlobalFlags{Format: "json"}
 	resolveErr := errors.New("resolve client failed")
