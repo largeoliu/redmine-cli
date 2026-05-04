@@ -3,6 +3,7 @@ package output
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 )
 
@@ -624,5 +625,134 @@ func TestApplyJQWithAdd(t *testing.T) {
 	output := buf.String()
 	if output != "15\n" {
 		t.Errorf("expected '15\\n', got %q", output)
+	}
+}
+
+func TestParseJQEmptyExpr(t *testing.T) {
+	q, err := ParseJQ("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if q == nil {
+		t.Error("expected non-nil query for empty expr")
+	}
+}
+
+func TestApplyJQNormalizedMarshalIndentError(t *testing.T) {
+	var buf bytes.Buffer
+	data := map[string]any{"key": "value"}
+	q, err := ParseJQ("infinite")
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	err = ApplyJQNormalized(&buf, data, q)
+	if err == nil {
+		t.Error("expected error from json.MarshalIndent for infinite value")
+	}
+}
+
+func TestApplyJQUnmarshalAfterMarshalError(t *testing.T) {
+	orig := jsonUnmarshal
+	jsonUnmarshal = func(data []byte, v any) error {
+		return fmt.Errorf("forced unmarshal error")
+	}
+	defer func() { jsonUnmarshal = orig }()
+
+	var buf bytes.Buffer
+	err := ApplyJQ(&buf, map[string]any{"key": "value"}, ".")
+	if err == nil {
+		t.Error("expected error from jsonUnmarshal")
+	}
+}
+
+func TestApplyJQMarshalIndentError(t *testing.T) {
+	var buf bytes.Buffer
+	data := map[string]any{"key": "value"}
+	err := ApplyJQ(&buf, data, "infinite")
+	if err == nil {
+		t.Error("expected error from json.MarshalIndent for infinite value")
+	}
+}
+
+func TestSelectFieldsNormalizedEmptyFields(t *testing.T) {
+	data := map[string]any{"id": 1, "name": "test"}
+	result, err := SelectFieldsNormalized(data, []string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(map[string]any)
+	if !ok {
+		t.Fatal("expected map result")
+	}
+	if len(m) != 2 {
+		t.Errorf("expected 2 fields, got %d", len(m))
+	}
+}
+
+func TestSelectFieldsNormalizedArrayOfMaps(t *testing.T) {
+	input := []any{
+		map[string]any{"id": float64(1), "name": "a", "extra": "x"},
+		map[string]any{"id": float64(2), "name": "b", "extra": "y"},
+		"string_item",
+	}
+	result, err := SelectFieldsNormalized(input, []string{"id", "name"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	arr, ok := result.([]any)
+	if !ok {
+		t.Fatal("expected array result")
+	}
+	if len(arr) != 3 {
+		t.Fatalf("expected 3 items, got %d", len(arr))
+	}
+	first := arr[0].(map[string]any)
+	if len(first) != 2 {
+		t.Errorf("expected 2 fields in first item, got %d", len(first))
+	}
+	if _, exists := first["extra"]; exists {
+		t.Error("expected 'extra' to be filtered out")
+	}
+	if arr[2] != "string_item" {
+		t.Errorf("expected non-map item preserved, got %v", arr[2])
+	}
+}
+
+func TestSelectFieldsSliceAnyFastPath(t *testing.T) {
+	payload := []any{
+		map[string]any{"id": float64(1), "name": "a"},
+		map[string]any{"id": float64(2), "name": "b"},
+	}
+	result, err := SelectFields(payload, []string{"id"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	arr, ok := result.([]any)
+	if !ok {
+		t.Fatal("expected array result")
+	}
+	if len(arr) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(arr))
+	}
+	first := arr[0].(map[string]any)
+	if _, exists := first["id"]; !exists {
+		t.Error("expected 'id' field")
+	}
+	if _, exists := first["name"]; exists {
+		t.Error("expected 'name' to be filtered out")
+	}
+}
+
+func TestSelectFieldsUnmarshalAfterMarshalError(t *testing.T) {
+	orig := jsonUnmarshal
+	jsonUnmarshal = func(data []byte, v any) error {
+		return fmt.Errorf("forced unmarshal error")
+	}
+	defer func() { jsonUnmarshal = orig }()
+
+	type customStruct struct{ ID int }
+	_, err := SelectFields(customStruct{ID: 1}, []string{"ID"})
+	if err == nil {
+		t.Error("expected error from jsonUnmarshal")
 	}
 }

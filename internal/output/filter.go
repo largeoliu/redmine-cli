@@ -8,6 +8,8 @@ import (
 	"github.com/itchyny/gojq"
 )
 
+var jsonUnmarshal = json.Unmarshal
+
 // ParseJQ parses and compiles a jq expression. The returned *gojq.Query
 // is safe to reuse across many calls for the same expression.
 func ParseJQ(expr string) (*gojq.Query, error) {
@@ -59,7 +61,7 @@ func ApplyJQ(w io.Writer, payload any, expr string) error {
 		return err
 	}
 	var input any
-	if err := json.Unmarshal(data, &input); err != nil {
+	if err := jsonUnmarshal(data, &input); err != nil {
 		return err
 	}
 	return ApplyJQNormalized(w, input, query)
@@ -150,7 +152,7 @@ func SelectFields(payload any, fields []string) (any, error) {
 		return nil, err
 	}
 	var input any
-	if err := json.Unmarshal(data, &input); err != nil {
+	if err := jsonUnmarshal(data, &input); err != nil {
 		return nil, err
 	}
 	return SelectFieldsNormalized(input, fields)
