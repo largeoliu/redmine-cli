@@ -15,8 +15,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/largeoliu/redmine-cli/internal/config"
 	"golang.org/x/term"
+
+	"github.com/largeoliu/redmine-cli/internal/config"
 )
 
 func TestNewLoginCommand(t *testing.T) {
