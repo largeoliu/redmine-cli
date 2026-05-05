@@ -15,6 +15,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/largeoliu/redmine-cli/internal/config"
 	"golang.org/x/term"
 )
 
@@ -584,6 +585,71 @@ func TestRunLoginEmptyInstanceName(t *testing.T) {
 	output := buf.String()
 	if !strings.Contains(output, "登录成功") {
 		t.Errorf("expected success message, got: %s", output)
+	}
+}
+
+type failingSetDefaultStore struct {
+	*config.Store
+}
+
+func (s *failingSetDefaultStore) SetDefault(_ string) error {
+	return fmt.Errorf("injected SetDefault error")
+}
+
+func TestRunLoginSetDefaultErrorInjected(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/users/current.json" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"user":{"id":1,"login":"test"}}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	os.Setenv("REDMINE_CONFIG_DIR", tmpDir)
+	defer os.Unsetenv("REDMINE_CONFIG_DIR")
+
+	orig := newConfigStore
+	newConfigStore = func(dir string) configStore {
+		return &failingSetDefaultStore{Store: config.NewStore(dir)}
+	}
+	defer func() { newConfigStore = orig }()
+
+	input := strings.Join([]string{
+		server.URL,
+		"test-api-key",
+		"test-instance",
+	}, "\n") + "\n"
+
+	oldStdin := os.Stdin
+	r, w, _ := os.Pipe()
+	os.Stdin = r
+
+	go func() {
+		defer w.Close()
+		w.Write([]byte(input))
+	}()
+
+	oldStdout := os.Stdout
+	rOut, wOut, _ := os.Pipe()
+	os.Stdout = wOut
+
+	ctx := context.Background()
+	flags := &GlobalFlags{}
+	err := runLogin(ctx, flags)
+
+	os.Stdin = oldStdin
+	wOut.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	io.Copy(&buf, rOut)
+
+	if err == nil {
+		t.Fatal("expected error for SetDefault failure, got nil")
 	}
 }
 

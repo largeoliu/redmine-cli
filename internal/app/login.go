@@ -22,6 +22,16 @@ var (
 	cyan  = color.New(color.FgCyan).SprintFunc()
 )
 
+var newConfigStore = func(dir string) configStore {
+	return config.NewStore(dir)
+}
+
+type configStore interface {
+	SaveInstance(name string, inst config.Instance) error
+	Load() (*config.Config, error)
+	SetDefault(name string) error
+}
+
 func newLoginCommand(flags *GlobalFlags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "login",
@@ -75,7 +85,7 @@ func runLogin(ctx context.Context, flags *GlobalFlags) error {
 		name = "default"
 	}
 
-	store := config.NewStore("")
+	store := newConfigStore("")
 	if err := store.SaveInstance(name, config.Instance{
 		URL:    url,
 		APIKey: apiKey,
