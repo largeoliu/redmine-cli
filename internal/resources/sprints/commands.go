@@ -108,7 +108,7 @@ func enrichSprintStatus(sprints []agilepkg.Sprint) []agilepkg.Sprint {
 			end, endErr := time.Parse("2006-01-02", sprint.EndDate)
 
 			if startErr == nil && endErr == nil {
-				if !start.After(now) && !end.Before(now) {
+				if !start.After(now) && !end.Before(now) && !end.Equal(now) {
 					result[i].Status = "active"
 					continue
 				}
