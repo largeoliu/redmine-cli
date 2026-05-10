@@ -229,8 +229,10 @@ jobs:
       - name: Run fuzz tests
         run: |
           export GOTOOLCHAIN=auto
-          go test -fuzz=Fuzz -fuzztime=2m ./internal/client/...
-        continue-on-error: true
+          for fuzz in FuzzBuildPath FuzzNewClient FuzzClientGet FuzzClientPost FuzzRetryDelay FuzzHandleErrorResponse; do
+            echo "Running $fuzz..."
+            go test -fuzz="$fuzz" -fuzztime=20s ./internal/client/...
+          done
 
   fuzz-output:
     name: Fuzz (output)
@@ -248,8 +250,10 @@ jobs:
       - name: Run fuzz tests
         run: |
           export GOTOOLCHAIN=auto
-          go test -fuzz=Fuzz -fuzztime=2m ./internal/output/...
-        continue-on-error: true
+          for fuzz in FuzzSanitize FuzzWriteJSON FuzzWriteTable FuzzApplyJQ FuzzSelectFields FuzzFormatValue FuzzTruncate FuzzWriteRaw FuzzNormalizePayload; do
+            echo "Running $fuzz..."
+            go test -fuzz="$fuzz" -fuzztime=20s ./internal/output/...
+          done
 
   benchmark:
     name: Benchmark (${{ matrix.package }})
