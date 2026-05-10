@@ -149,3 +149,42 @@ func TestWriteKeyValuesWriteError(t *testing.T) {
 		t.Fatal("expected error from errorWriter, got nil")
 	}
 }
+
+func TestWriteHeaderLineWriteError(t *testing.T) {
+	w := &errorWriter{}
+	headers := []string{"H1", "H2"}
+	widths := []int{5, 5}
+	err := writeHeaderLine(w, headers, widths)
+	if err == nil {
+		t.Fatal("expected error from errorWriter, got nil")
+	}
+}
+
+func TestWriteSeparatorLineWriteError(t *testing.T) {
+	w := &errorWriter{}
+	widths := []int{5, 5}
+	err := writeSeparatorLine(w, widths)
+	if err == nil {
+		t.Fatal("expected error from errorWriter, got nil")
+	}
+}
+
+func TestRowsFromSliceWithMixedMapAndStruct(t *testing.T) {
+	items := []any{
+		map[string]any{"id": 1},
+		struct{ Name string }{"Bob"},
+	}
+	headers, rows, ok := rowsFromSlice(items)
+	if !ok {
+		t.Error("expected ok to be true")
+	}
+	if len(headers) != 1 {
+		t.Errorf("expected 1 header, got %d", len(headers))
+	}
+	if headers[0] != "value" {
+		t.Errorf("expected header 'value', got %s", headers[0])
+	}
+	if len(rows) != 2 {
+		t.Errorf("expected 2 rows, got %d", len(rows))
+	}
+}
