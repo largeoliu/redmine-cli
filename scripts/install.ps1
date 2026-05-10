@@ -1,6 +1,7 @@
 param(
     [string]$InstallDir = "",
-    [string]$Version = ""
+    [string]$Version = "",
+    [switch]$SkipPathUpdate
 )
 
 $ErrorActionPreference = "Stop"
@@ -8,7 +9,6 @@ $ErrorActionPreference = "Stop"
 try {
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 } catch {
-    # Older PowerShell may not support Tls12 flag; ignore and continue.
 }
 
 $REPO = "largeoliu/redmine-cli"
@@ -50,11 +50,20 @@ function Get-OS {
 }
 
 function Get-Arch {
-    $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
-    switch ($arch) {
-        "X64" { return "amd64" }
-        "Arm64" { return "arm64" }
-        default { Write-Error-Exit "Unsupported architecture: $arch" }
+    try {
+        $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
+        switch ($arch) {
+            "X64" { return "amd64" }
+            "Arm64" { return "arm64" }
+            default { Write-Error-Exit "Unsupported architecture: $arch" }
+        }
+    } catch {
+    }
+
+    switch ($env:PROCESSOR_ARCHITECTURE) {
+        "AMD64" { return "amd64" }
+        "ARM64" { return "arm64" }
+        default { Write-Error-Exit "Unsupported architecture: $env:PROCESSOR_ARCHITECTURE" }
     }
 }
 
@@ -82,16 +91,27 @@ function Get-LatestVersion {
         if ($version) { return $version }
     }
 
-    # Fallback: use the GitHub REST API, which returns JSON with the tag name.
     try {
         $apiUrl = "https://api.github.com/repos/$REPO/releases/latest"
         $json = Invoke-RestMethod -Uri $apiUrl -UseBasicParsing -Headers @{ "User-Agent" = "redmine-cli-installer" }
         if ($json.tag_name) { return $json.tag_name }
     } catch {
-        # Fall through to the error below.
     }
 
     Write-Error-Exit "Failed to get latest version"
+}
+
+function Get-WebContent {
+    param([string]$Url)
+
+    $response = Invoke-WebRequest -Uri $Url -UseBasicParsing
+    $content = $response.Content
+
+    if ($content -is [byte[]]) {
+        return [System.Text.Encoding]::UTF8.GetString($content)
+    }
+
+    return [string]$content
 }
 
 function Confirm-Checksum {
@@ -100,29 +120,30 @@ function Confirm-Checksum {
         [string]$ArchiveName,
         [string]$ArchivePath
     )
-    
+
     $checksumsUrl = "https://github.com/$REPO/releases/download/$Version/checksums.txt"
-    
+
     Write-Info "Downloading checksums..."
     try {
-        $checksumsContent = Invoke-WebRequest -Uri $checksumsUrl -UseBasicParsing | Select-Object -ExpandProperty Content
+        $checksumsContent = Get-WebContent -Url $checksumsUrl
     } catch {
         Write-Warn "Could not download checksums, skipping verification"
         return
     }
-    
+
+    $checksumsContent = $checksumsContent -replace "`r", ""
     $expectedHash = ($checksumsContent -split "`n" | Where-Object { $_ -match "\s+$([regex]::Escape($ArchiveName))`$" } | Select-Object -First 1) -replace '\s+.*', ''
     if (-not $expectedHash) {
         Write-Warn "Archive not found in checksums file, skipping verification"
         return
     }
-    
+
     Write-Info "Verifying checksum..."
     $actualHash = (Get-FileHash -Path $ArchivePath -Algorithm SHA256).Hash.ToLower()
     if ($actualHash -ne $expectedHash.ToLower()) {
         Write-Error-Exit "Checksum mismatch! Expected: $expectedHash, Actual: $actualHash"
     }
-    
+
     Write-Info "Checksum verified"
 }
 
@@ -132,31 +153,31 @@ function Download-Binary {
         [string]$OS,
         [string]$Arch
     )
-    
+
     $archiveName = "${ASSET_NAME_PREFIX}_$($Version.Substring(1))_${OS}_${Arch}.zip"
     $downloadUrl = "https://github.com/$REPO/releases/download/$Version/$archiveName"
-    
+
     Write-Info "Downloading $archiveName..."
-    
+
     $tmpDir = New-TemporaryDirectory
     $archivePath = Join-Path $tmpDir $archiveName
-    
+
     try {
         Invoke-WebRequest -Uri $downloadUrl -OutFile $archivePath -UseBasicParsing
     } catch {
         Write-Error-Exit "Failed to download $archiveName : $_"
     }
-    
+
     Confirm-Checksum -Version $Version -ArchiveName $archiveName -ArchivePath $archivePath
-    
+
     Write-Info "Extracting..."
-    
+
     try {
         Expand-Archive -Path $archivePath -DestinationPath $tmpDir -Force
     } catch {
         Write-Error-Exit "Failed to extract archive: $_"
     }
-    
+
     return $tmpDir
 }
 
@@ -169,25 +190,25 @@ function New-TemporaryDirectory {
 
 function Install-Binary {
     param([string]$TmpDir)
-    
+
     if (-not (Test-Path $InstallDir)) {
         Write-Info "Creating install directory: $InstallDir"
         New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
     }
-    
+
     $binaryPath = Join-Path $TmpDir "$BINARY_NAME.exe"
-    
+
     if (-not (Test-Path $binaryPath)) {
         $binaryPath = Join-Path $TmpDir $BINARY_NAME
     }
-    
+
     if (-not (Test-Path $binaryPath)) {
         Write-Error-Exit "Binary not found in archive"
     }
-    
+
     $destPath = Join-Path $InstallDir "$BINARY_NAME.exe"
     Move-Item -Path $binaryPath -Destination $destPath -Force
-    
+
     Remove-Item -Path $TmpDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 
@@ -224,12 +245,25 @@ if (-not (Test-PathInEnv)) {
     Write-Host ""
     Write-Warn "$InstallDir is not in your PATH"
     Write-Host ""
-    
-    $addToPath = Read-Host "Would you like to add it to your PATH? (Y/n)"
-    if ($addToPath -ne "n" -and $addToPath -ne "N") {
-        Add-ToPath
+
+    if ($SkipPathUpdate -or [Console]::IsInputRedirected()) {
+        Write-Host "Add the following to your PATH manually:"
+        Write-Host "    $InstallDir"
         Write-Host ""
-        Write-Info "Please restart your terminal or run: `$env:Path = [System.Environment]::GetEnvironmentVariable('Path','User')"
+        Write-Host "Or re-run with: irm https://raw.githubusercontent.com/$REPO/master/scripts/install.ps1 | iex"
+    } else {
+        try {
+            $addToPath = Read-Host "Would you like to add it to your PATH? (Y/n)"
+            if ($addToPath -ne "n" -and $addToPath -ne "N") {
+                Add-ToPath
+                Write-Host ""
+                Write-Info "Please restart your terminal or run: `$env:Path = [System.Environment]::GetEnvironmentVariable('Path','User')"
+            }
+        } catch {
+            Write-Host ""
+            Write-Warn "Cannot read input in this session. To add to PATH manually:"
+            Write-Host "    [Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path','User') + ';$InstallDir', 'User')"
+        }
     }
 }
 
