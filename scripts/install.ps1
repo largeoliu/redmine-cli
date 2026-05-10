@@ -35,7 +35,7 @@ function Write-Error-Exit {
     param([string]$Message)
     Write-Host "[ERROR] " -ForegroundColor Red -NoNewline
     Write-Host $Message
-    exit 1
+    throw $Message
 }
 
 function Get-OS {
@@ -226,46 +226,51 @@ function Add-ToPath {
     }
 }
 
-$os = Get-OS
-$arch = Get-Arch
+try {
+    $os = Get-OS
+    $arch = Get-Arch
 
-if (-not $Version) {
-    $Version = Get-LatestVersion
-}
+    if (-not $Version) {
+        $Version = Get-LatestVersion
+    }
 
-Write-Info "Installing $BINARY_NAME..."
-Write-Info "OS: $os, Arch: $arch, Version: $Version"
+    Write-Info "Installing $BINARY_NAME..."
+    Write-Info "OS: $os, Arch: $arch, Version: $Version"
 
-$tmpDir = Download-Binary -Version $Version -OS $os -Arch $arch
-Install-Binary -TmpDir $tmpDir
+    $tmpDir = Download-Binary -Version $Version -OS $os -Arch $arch
+    Install-Binary -TmpDir $tmpDir
 
-Write-Info "Successfully installed $BINARY_NAME to $InstallDir"
+    Write-Info "Successfully installed $BINARY_NAME to $InstallDir"
 
-if (-not (Test-PathInEnv)) {
-    Write-Host ""
-    Write-Warn "$InstallDir is not in your PATH"
-    Write-Host ""
-
-    if ($SkipPathUpdate -or [Console]::IsInputRedirected()) {
-        Write-Host "Add the following to your PATH manually:"
-        Write-Host "    $InstallDir"
+    if (-not (Test-PathInEnv)) {
         Write-Host ""
-        Write-Host "Or re-run with: irm https://raw.githubusercontent.com/$REPO/master/scripts/install.ps1 | iex"
-    } else {
-        try {
-            $addToPath = Read-Host "Would you like to add it to your PATH? (Y/n)"
-            if ($addToPath -ne "n" -and $addToPath -ne "N") {
-                Add-ToPath
-                Write-Host ""
-                Write-Info "Please restart your terminal or run: `$env:Path = [System.Environment]::GetEnvironmentVariable('Path','User')"
-            }
-        } catch {
+        Write-Warn "$InstallDir is not in your PATH"
+        Write-Host ""
+
+        if ($SkipPathUpdate -or [Console]::IsInputRedirected()) {
+            Write-Host "Add the following to your PATH manually:"
+            Write-Host "    $InstallDir"
             Write-Host ""
-            Write-Warn "Cannot read input in this session. To add to PATH manually:"
-            Write-Host "    [Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path','User') + ';$InstallDir', 'User')"
+            Write-Host "Or re-run with: irm https://raw.githubusercontent.com/$REPO/master/scripts/install.ps1 | iex"
+        } else {
+            try {
+                $addToPath = Read-Host "Would you like to add it to your PATH? (Y/n)"
+                if ($addToPath -ne "n" -and $addToPath -ne "N") {
+                    Add-ToPath
+                    Write-Host ""
+                    Write-Info "Please restart your terminal or run: `$env:Path = [System.Environment]::GetEnvironmentVariable('Path','User')"
+                }
+            } catch {
+                Write-Host ""
+                Write-Warn "Cannot read input in this session. To add to PATH manually:"
+                Write-Host "    [Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path','User') + ';$InstallDir', 'User')"
+            }
         }
     }
-}
 
-Write-Host ""
-Write-Info "Run '$BINARY_NAME --help' to get started"
+    Write-Host ""
+    Write-Info "Run '$BINARY_NAME --help' to get started"
+} catch {
+    Write-Host "[ERROR] " -ForegroundColor Red -NoNewline
+    Write-Host $_.Exception.Message
+}
