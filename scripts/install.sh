@@ -46,6 +46,10 @@ get_latest_version() {
     latest_url="https://github.com/${REPO}/releases/latest"
     version=$(curl -sI "$latest_url" | grep -i "location:" | sed 's/.*\/tag\/\(.*\)/\1/' | tr -d '\r\n')
     if [ -z "$version" ]; then
+        api_url="https://api.github.com/repos/${REPO}/releases/latest"
+        version=$(curl -fsSL "$api_url" -H "User-Agent: redmine-cli-installer" | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -n 1)
+    fi
+    if [ -z "$version" ]; then
         error "Failed to get latest version"
     fi
     echo "$version"
