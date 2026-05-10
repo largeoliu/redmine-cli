@@ -5,6 +5,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
 $REPO = "largeoliu/redmine-cli"
 $ASSET_NAME_PREFIX = "redmine-cli"
 $BINARY_NAME = "redmine"
@@ -29,7 +31,7 @@ function Write-Error-Exit {
     param([string]$Message)
     Write-Host "[ERROR] " -ForegroundColor Red -NoNewline
     Write-Host $Message
-    exit 1
+    throw $Message
 }
 
 function Get-OS {
@@ -59,13 +61,13 @@ function Get-LatestVersion {
     } catch {
         $response = $_.Exception.Response
     }
-    
+
     if ($response.Headers.Location) {
         $location = $response.Headers.Location.ToString()
         $version = $location.Split("/")[-1]
         return $version
     }
-    
+
     Write-Error-Exit "Failed to get latest version"
 }
 
@@ -75,9 +77,9 @@ function Confirm-Checksum {
         [string]$ArchiveName,
         [string]$ArchivePath
     )
-    
+
     $checksumsUrl = "https://github.com/$REPO/releases/download/$Version/checksums.txt"
-    
+
     Write-Info "Downloading checksums..."
     try {
         $checksumsContent = Invoke-WebRequest -Uri $checksumsUrl -UseBasicParsing | Select-Object -ExpandProperty Content
@@ -85,19 +87,19 @@ function Confirm-Checksum {
         Write-Warn "Could not download checksums, skipping verification"
         return
     }
-    
+
     $expectedHash = ($checksumsContent -split "`n" | Where-Object { $_ -match "\s+$([regex]::Escape($ArchiveName))`$" } | Select-Object -First 1) -replace '\s+.*', ''
     if (-not $expectedHash) {
         Write-Warn "Archive not found in checksums file, skipping verification"
         return
     }
-    
+
     Write-Info "Verifying checksum..."
     $actualHash = (Get-FileHash -Path $ArchivePath -Algorithm SHA256).Hash.ToLower()
     if ($actualHash -ne $expectedHash.ToLower()) {
         Write-Error-Exit "Checksum mismatch! Expected: $expectedHash, Actual: $actualHash"
     }
-    
+
     Write-Info "Checksum verified"
 }
 
@@ -107,31 +109,31 @@ function Download-Binary {
         [string]$OS,
         [string]$Arch
     )
-    
+
     $archiveName = "${ASSET_NAME_PREFIX}_$($Version.Substring(1))_${OS}_${Arch}.zip"
     $downloadUrl = "https://github.com/$REPO/releases/download/$Version/$archiveName"
-    
+
     Write-Info "Downloading $archiveName..."
-    
+
     $tmpDir = New-TemporaryDirectory
     $archivePath = Join-Path $tmpDir $archiveName
-    
+
     try {
         Invoke-WebRequest -Uri $downloadUrl -OutFile $archivePath -UseBasicParsing
     } catch {
         Write-Error-Exit "Failed to download $archiveName : $_"
     }
-    
+
     Confirm-Checksum -Version $Version -ArchiveName $archiveName -ArchivePath $archivePath
-    
+
     Write-Info "Extracting..."
-    
+
     try {
         Expand-Archive -Path $archivePath -DestinationPath $tmpDir -Force
     } catch {
         Write-Error-Exit "Failed to extract archive: $_"
     }
-    
+
     return $tmpDir
 }
 
@@ -144,25 +146,25 @@ function New-TemporaryDirectory {
 
 function Install-Binary {
     param([string]$TmpDir)
-    
+
     if (-not (Test-Path $InstallDir)) {
         Write-Info "Creating install directory: $InstallDir"
         New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
     }
-    
+
     $binaryPath = Join-Path $TmpDir "$BINARY_NAME.exe"
-    
+
     if (-not (Test-Path $binaryPath)) {
         $binaryPath = Join-Path $TmpDir $BINARY_NAME
     }
-    
+
     if (-not (Test-Path $binaryPath)) {
         Write-Error-Exit "Binary not found in archive"
     }
-    
+
     $destPath = Join-Path $InstallDir "$BINARY_NAME.exe"
     Move-Item -Path $binaryPath -Destination $destPath -Force
-    
+
     Remove-Item -Path $TmpDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 
@@ -180,33 +182,41 @@ function Add-ToPath {
     }
 }
 
-$os = Get-OS
-$arch = Get-Arch
+try {
+    $os = Get-OS
+    $arch = Get-Arch
 
-if (-not $Version) {
-    $Version = Get-LatestVersion
-}
-
-Write-Info "Installing $BINARY_NAME..."
-Write-Info "OS: $os, Arch: $arch, Version: $Version"
-
-$tmpDir = Download-Binary -Version $Version -OS $os -Arch $arch
-Install-Binary -TmpDir $tmpDir
-
-Write-Info "Successfully installed $BINARY_NAME to $InstallDir"
-
-if (-not (Test-PathInEnv)) {
-    Write-Host ""
-    Write-Warn "$InstallDir is not in your PATH"
-    Write-Host ""
-    
-    $addToPath = Read-Host "Would you like to add it to your PATH? (Y/n)"
-    if ($addToPath -ne "n" -and $addToPath -ne "N") {
-        Add-ToPath
-        Write-Host ""
-        Write-Info "Please restart your terminal or run: `$env:Path = [System.Environment]::GetEnvironmentVariable('Path','User')"
+    if (-not $Version) {
+        $Version = Get-LatestVersion
     }
-}
 
-Write-Host ""
-Write-Info "Run '$BINARY_NAME --help' to get started"
+    Write-Info "Installing $BINARY_NAME..."
+    Write-Info "OS: $os, Arch: $arch, Version: $Version"
+
+    $tmpDir = Download-Binary -Version $Version -OS $os -Arch $arch
+    Install-Binary -TmpDir $tmpDir
+
+    Write-Info "Successfully installed $BINARY_NAME to $InstallDir"
+
+    if (-not (Test-PathInEnv)) {
+        Write-Host ""
+        Write-Warn "$InstallDir is not in your PATH"
+        Write-Host ""
+
+        $addToPath = Read-Host "Would you like to add it to your PATH? (Y/n)"
+        if ($addToPath -ne "n" -and $addToPath -ne "N") {
+            Add-ToPath
+            Write-Host ""
+            Write-Info "Please restart your terminal or run: `$env:Path = [System.Environment]::GetEnvironmentVariable('Path','User')"
+        }
+    }
+
+    Write-Host ""
+    Write-Info "Run '$BINARY_NAME --help' to get started"
+} catch {
+    Write-Host ""
+    Write-Host "[ERROR] Installation failed: $_" -ForegroundColor Red
+} finally {
+    Write-Host ""
+    Read-Host "Press Enter to exit"
+}
