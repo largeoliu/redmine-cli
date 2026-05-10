@@ -5,6 +5,12 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+} catch {
+    # Older PowerShell may not support Tls12 flag; ignore and continue.
+}
+
 $REPO = "largeoliu/redmine-cli"
 $ASSET_NAME_PREFIX = "redmine-cli"
 $BINARY_NAME = "redmine"
@@ -54,18 +60,37 @@ function Get-Arch {
 
 function Get-LatestVersion {
     $latestUrl = "https://github.com/$REPO/releases/latest"
+    $location = $null
     try {
-        $response = Invoke-WebRequest -Uri $latestUrl -Method Head -MaximumRedirection 0 -ErrorAction SilentlyContinue
+        $response = Invoke-WebRequest -Uri $latestUrl -Method Head -MaximumRedirection 0 -UseBasicParsing -ErrorAction SilentlyContinue
+        if ($response -and $response.Headers -and $response.Headers["Location"]) {
+            $location = [string]($response.Headers["Location"] | Select-Object -First 1)
+        }
     } catch {
-        $response = $_.Exception.Response
+        $resp = $_.Exception.Response
+        if ($resp) {
+            if ($resp.Headers -and $resp.Headers["Location"]) {
+                $location = [string]($resp.Headers["Location"] | Select-Object -First 1)
+            } elseif ($resp.Headers -and $resp.Headers.Location) {
+                $location = $resp.Headers.Location.ToString()
+            }
+        }
     }
-    
-    if ($response.Headers.Location) {
-        $location = $response.Headers.Location.ToString()
-        $version = $location.Split("/")[-1]
-        return $version
+
+    if ($location) {
+        $version = $location.TrimEnd("/").Split("/")[-1]
+        if ($version) { return $version }
     }
-    
+
+    # Fallback: use the GitHub REST API, which returns JSON with the tag name.
+    try {
+        $apiUrl = "https://api.github.com/repos/$REPO/releases/latest"
+        $json = Invoke-RestMethod -Uri $apiUrl -UseBasicParsing -Headers @{ "User-Agent" = "redmine-cli-installer" }
+        if ($json.tag_name) { return $json.tag_name }
+    } catch {
+        # Fall through to the error below.
+    }
+
     Write-Error-Exit "Failed to get latest version"
 }
 
