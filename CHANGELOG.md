@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1](https://github.com/largeoliu/redmine-cli/compare/v0.5.0...v0.5.1) (2026-05-10)
+
+
+### Bug Fixes
+
+* **app:** 提升单元测试覆盖率至 100% ([#102](https://github.com/largeoliu/redmine-cli/issues/102)) ([b2bc82d](https://github.com/largeoliu/redmine-cli/commit/b2bc82dbab74a7140c7a77eec84843a28f1f86ac))
+* **install:** add -UseBasicParsing to Invoke-WebRequest and improve Headers[Location] access ([#106](https://github.com/largeoliu/redmine-cli/issues/106)) ([058c443](https://github.com/largeoliu/redmine-cli/commit/058c44343685691375de3b7d28e77651714c509b))
+* **install:** add api.github.com fallback for version detection in install.sh ([#110](https://github.com/largeoliu/redmine-cli/issues/110)) ([8e730b4](https://github.com/largeoliu/redmine-cli/commit/8e730b4f1ed6e5d5314cadb9c6ac1b72dba85c64))
+* **install:** convert OSArchitecture enum to string before switch comparison ([#111](https://github.com/largeoliu/redmine-cli/issues/111)) ([73c310c](https://github.com/largeoliu/redmine-cli/commit/73c310c25ea2047b43bbe40534fbb3462c25d007))
+* **install:** prevent PowerShell window close on errors via iex ([#109](https://github.com/largeoliu/redmine-cli/issues/109)) ([252e7ef](https://github.com/largeoliu/redmine-cli/commit/252e7ef58ae634543aee830bf4c964489037bdfc))
+* **sprints:** 使用动态日期替代硬编码日期修复 TestEnrichSprintStatus ([#107](https://github.com/largeoliu/redmine-cli/issues/107)) ([df902ea](https://github.com/largeoliu/redmine-cli/commit/df902ea32edfe15e0ba9dca69fda5f2dd5863679))
+* support 'sprints' field in resolveSprintID response ([#91](https://github.com/largeoliu/redmine-cli/issues/91)) ([99f9bf9](https://github.com/largeoliu/redmine-cli/commit/99f9bf9581c64680606b7fcabdc4a0983a929041))
+* tracker default_status type mismatch causes decode failure ([#93](https://github.com/largeoliu/redmine-cli/issues/93)) ([b177d00](https://github.com/largeoliu/redmine-cli/commit/b177d00a6649ecdf5deb5f9a31c18f530fafa287))
+* Windows PowerShell 5.1 compatibility for install.ps1 ([#108](https://github.com/largeoliu/redmine-cli/issues/108)) ([0d94f8a](https://github.com/largeoliu/redmine-cli/commit/0d94f8ab1b32a37ec2ee47fc52b08df0b83f31a7))
+
+
+### Performance Improvements
+
+* **ci:** parallelize test shards and reduce benchmark time ([#96](https://github.com/largeoliu/redmine-cli/issues/96)) ([e40b7ed](https://github.com/largeoliu/redmine-cli/commit/e40b7ed0d648a6978ad9c4bcfe61cd831b8910d8))
+* reduce redundant JSON marshal/unmarshal and URL parsing ([#90](https://github.com/largeoliu/redmine-cli/issues/90)) ([cc50d27](https://github.com/largeoliu/redmine-cli/commit/cc50d27a36275434689228d41cdb6c3d1900450e))
+
 ## [0.5.0](https://github.com/largeoliu/redmine-cli/compare/v0.4.5...v0.5.0) (2026-04-25)
 
 
