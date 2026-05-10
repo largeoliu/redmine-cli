@@ -52,10 +52,11 @@ function Get-OS {
 function Get-Arch {
     try {
         $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
-        switch ($arch) {
+        $archStr = $arch.ToString()
+        switch ($archStr) {
             "X64" { return "amd64" }
             "Arm64" { return "arm64" }
-            default { Write-Error-Exit "Unsupported architecture: $arch" }
+            default { Write-Error-Exit "Unsupported architecture: $archStr" }
         }
     } catch {
     }
