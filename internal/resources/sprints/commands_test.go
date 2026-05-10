@@ -240,10 +240,10 @@ func TestEnrichSprintStatus(t *testing.T) {
 		{
 			name: "当前日期在 sprint 期间则为 active",
 			input: []agile.Sprint{
-				{ID: 1, StartDate: "2026-04-20", EndDate: "2026-05-10"},
+				{ID: 1, StartDate: "2026-05-20", EndDate: "2026-06-10"},
 			},
 			expected: []agile.Sprint{
-				{ID: 1, StartDate: "2026-04-20", EndDate: "2026-05-10", Status: "active"},
+				{ID: 1, StartDate: "2026-05-20", EndDate: "2026-06-10", Status: "active"},
 			},
 		},
 		{
@@ -287,12 +287,12 @@ func TestEnrichSprintStatus(t *testing.T) {
 			input: []agile.Sprint{
 				{ID: 1, IsClosed: true},
 				{ID: 2, IsArchived: true},
-				{ID: 3, StartDate: "2026-04-20", EndDate: "2026-05-10"},
+				{ID: 3, StartDate: "2026-05-20", EndDate: "2026-06-10"},
 			},
 			expected: []agile.Sprint{
 				{ID: 1, IsClosed: true, Status: "closed"},
 				{ID: 2, IsArchived: true, Status: "archived"},
-				{ID: 3, StartDate: "2026-04-20", EndDate: "2026-05-10", Status: "active"},
+				{ID: 3, StartDate: "2026-05-20", EndDate: "2026-06-10", Status: "active"},
 			},
 		},
 	}
